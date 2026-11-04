@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regions.local/schema/city-snapshot.v1.schema.json",
+  "title": "CitySnapshot v1",
+  "description": "One published observation of a loaded city. null = unknown, never zero. Writers emit every property, including explicit nulls.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "cityId", "seq", "parentSeq", "producer", "profiles", "gameTime", "measurementWindowGameHours", "resources", "outsideConnections", "exportedAtUtc"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "cityId": { "$ref": "common.v1.schema.json#/$defs/id" },
+    "seq": { "type": "integer", "minimum": 1 },
+    "parentSeq": { "type": ["integer", "null"], "minimum": 1 },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool", "toolVersion", "gameBuild", "capabilityReportSha256"],
+      "properties": {
+        "tool": { "enum": ["CS2Integration", "CitySimulator"] },
+        "toolVersion": { "type": "string", "minLength": 1 },
+        "gameBuild": { "type": ["string", "null"] },
+        "capabilityReportSha256": { "anyOf": [{ "$ref": "common.v1.schema.json#/$defs/sha256" }, { "type": "null" }] }
+      }
+    },
+    "profiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["map", "economy", "mobility", "occupancy", "companyControl", "factoryProduction", "settingsFingerprint"],
+      "properties": {
+        "map": { "$ref": "common.v1.schema.json#/$defs/mapProfile" },
+        "economy": { "$ref": "common.v1.schema.json#/$defs/economyProfile" },
+        "mobility": { "$ref": "common.v1.schema.json#/$defs/mobilityProfile" },
+        "occupancy": { "$ref": "common.v1.schema.json#/$defs/occupancyProfile" },
+        "companyControl": { "$ref": "common.v1.schema.json#/$defs/companyControlProfile" },
+        "factoryProduction": { "$ref": "common.v1.schema.json#/$defs/factoryProductionProfile" },
+        "settingsFingerprint": { "type": ["string", "null"] }
+      }
+    },
+    "gameTime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gameDays", "rawTick"],
+      "properties": {
+        "gameDays": { "$ref": "common.v1.schema.json#/$defs/nonNegNumberOrNull" },
+        "rawTick": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "measurementWindowGameHours": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+    "resources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["resourceId", "realizedOutputPerGameDay", "inputUsePerGameDay", "capacityEstimatePerGameDay", "producerCompanyCount", "confidence", "source"],
+        "properties": {
+          "resourceId": { "$ref": "common.v1.schema.json#/$defs/id" },
+          "realizedOutputPerGameDay": { "$ref": "common.v1.schema.json#/$defs/nonNegNumberOrNull" },
+          "inputUsePerGameDay": { "$ref": "common.v1.schema.json#/$defs/nonNegNumberOrNull" },
+          "capacityEstimatePerGameDay": { "$ref": "common.v1.schema.json#/$defs/nonNegNumberOrNull" },
+          "producerCompanyCount": { "type": ["integer", "null"], "minimum": 0 },
+          "confidence": { "$ref": "common.v1.schema.json#/$defs/confidence" },
+          "source": { "type": "string" }
+        }
+      }
+    },
+    "outsideConnections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["endpointKey", "kind", "transportModes", "positionMetres", "carriesCargo", "carriesPassengers"],
+        "properties": {
+          "endpointKey": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "kind": { "$ref": "common.v1.schema.json#/$defs/connectionKind" },
+          "transportModes": { "type": "array", "uniqueItems": true, "items": { "$ref": "common.v1.schema.json#/$defs/transportMode" } },
+          "positionMetres": {
+            "anyOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["x", "y", "z"],
+                "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "z": { "type": "number" } }
+              }
+            ]
+          },
+          "carriesCargo": { "type": ["boolean", "null"] },
+          "carriesPassengers": { "type": ["boolean", "null"] }
+        },
+        "if": { "properties": { "kind": { "const": "Transport" } } },
+        "then": { "properties": { "transportModes": { "minItems": 1 } } },
+        "else": { "properties": { "transportModes": { "maxItems": 0 } } }
+      }
+    },
+    "exportedAtUtc": { "type": ["string", "null"] }
+  }
+}

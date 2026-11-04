@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "gameBuild": null,
+  "modVersion": "0.0.1-golden",
+  "activeMods": [],
+  "activeModsEnumerated": false,
+  "features": [
+    { "feature": "RegistryRead", "status": "Enabled", "reason": "Read-only snapshot export" },
+    { "feature": "TransportGraph", "status": "Enabled", "reason": "Outside-connection inventory only" },
+    { "feature": "MarketShadow", "status": "ShadowOnly", "reason": "Quotes computed outside the game in Prototype 0" },
+    { "feature": "MarketWrite", "status": "Disabled", "reason": "No verified hook (V-17, V-18)" },
+    { "feature": "FiscalShadow", "status": "Disabled", "reason": "Not in Prototype 0" },
+    { "feature": "FiscalWrite", "status": "Disabled", "reason": "Not in Prototype 0" },
+    { "feature": "PopulationShadow", "status": "Disabled", "reason": "Not in Prototype 0" },
+    { "feature": "PopulationWrite", "status": "Disabled", "reason": "Not in Prototype 0" }
+  ],
+  "verifiedAssumptions": [],
+  "warnings": ["Golden sample: not produced by a running game"]
+}

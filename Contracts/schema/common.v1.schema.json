@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regions.local/schema/common.v1.schema.json",
+  "title": "Shared definitions v1",
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "nonNegNumberOrNull": { "type": ["number", "null"], "minimum": 0 },
+    "transportMode": { "enum": ["Road", "Rail", "Ship", "Air"] },
+    "connectionKind": { "enum": ["Transport", "Electricity", "Water", "Sewage"] },
+    "confidence": { "enum": ["Validated", "Provisional", "Unknown"] },
+    "linkStatus": { "enum": ["Proposed", "Verified", "Broken", "Unresolved"] },
+    "mapProfile": { "enum": ["Vanilla", "MapExt28", "MapExt43", "MapExt57", "Unknown"] },
+    "economyProfile": { "enum": ["Vanilla", "MapExt", "EconomyEX", "Unknown"] },
+    "mobilityProfile": { "enum": ["Vanilla", "RealisticTrips", "RTT", "Unknown"] },
+    "occupancyProfile": { "enum": ["Vanilla", "RWH", "AdvancedBuildingControl", "Mixed", "Unknown"] },
+    "companyControlProfile": { "enum": ["Vanilla", "ChangeCompany", "Mixed", "Unknown"] },
+    "factoryProductionProfile": { "enum": ["Vanilla", "SignatureLogistics", "IndustriesExtended", "Mixed", "Unknown"] },
+    "originKind": { "enum": ["City", "World"] },
+    "excludedReason": { "enum": ["NoPath", "ModeIncompatible", "StaleSnapshot", "NoSupply", "UnknownSupply", "NoWorldGateway", "UnknownResource"] },
+    "reportedAs": { "enum": ["ModeledPriceQuoteNotPhysicalTrade"] },
+    "feature": { "enum": ["RegistryRead", "TransportGraph", "MarketShadow", "MarketWrite", "FiscalShadow", "FiscalWrite", "PopulationShadow", "PopulationWrite"] },
+    "featureStatus": { "enum": ["Enabled", "ShadowOnly", "Disabled"] }
+  }
+}

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Shared data contracts. MUST stay free of game, Unity, Harmony and serializer dependencies.
+    netstandard2.0 so the CS2 mod (expected .NET Framework 4.8 / Mono, unverified: V-02) and net8 tests can both reference it.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Regions.Contracts</RootNamespace>
+    <AssemblyName>Regions.Contracts</AssemblyName>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="schema\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="resources\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "regionId": "region-golden-v1",
+  "revision": 1,
+  "cities": [
+    {
+      "cityId": "city-a",
+      "displayName": "Ironvale (producer)",
+      "saveRef": "golden-city-a",
+      "placement": { "originXMetres": 0, "originYMetres": 0, "sizeXMetres": 14336, "sizeYMetres": 14336, "rotationDegrees": 0, "mapProfile": "Vanilla" }
+    },
+    {
+      "cityId": "city-b",
+      "displayName": "Carford (consumer)",
+      "saveRef": "golden-city-b",
+      "placement": { "originXMetres": 14336, "originYMetres": 0, "sizeXMetres": 14336, "sizeYMetres": 14336, "rotationDegrees": 0, "mapProfile": "Vanilla" }
+    },
+    {
+      "cityId": "city-c",
+      "displayName": "Lonepeak (isolated)",
+      "saveRef": null,
+      "placement": null
+    }
+  ],
+  "links": [
+    {
+      "linkId": "ab-rail-01",
+      "a": { "cityId": "city-a", "endpointKey": "oc-rail-east-01" },
+      "b": { "cityId": "city-b", "endpointKey": "oc-rail-west-01" },
+      "mode": "Rail",
+      "distanceKm": 400,
+      "bidirectional": true,
+      "status": "Proposed"
+    },
+    {
+      "linkId": "ab-road-01",
+      "a": { "cityId": "city-a", "endpointKey": "oc-road-east-01" },
+      "b": { "cityId": "city-b", "endpointKey": "oc-road-west-01" },
+      "mode": "Road",
+      "distanceKm": 400,
+      "bidirectional": true,
+      "status": "Proposed"
+    }
+  ],
+  "worldGateways": [
+    { "cityId": "city-b", "endpointKey": "oc-road-south-01", "mode": "Road", "distanceKm": 100 }
+  ],
+  "parameters": {
+    "modeCosts": [
+      { "mode": "Road", "fixedCost": 2, "costPerKm": 0.1 },
+      { "mode": "Rail", "fixedCost": 18, "costPerKm": 0.04 },
+      { "mode": "Ship", "fixedCost": 30, "costPerKm": 0.01 }
+    ],
+    "resourcePrices": [
+      { "resourceId": "Steel", "regionalProducerPriceIndex": 100, "worldProducerPriceIndex": 128 }
+    ],
+    "staleness": { "maxRegionSeqAge": 10 }
+  }
+}

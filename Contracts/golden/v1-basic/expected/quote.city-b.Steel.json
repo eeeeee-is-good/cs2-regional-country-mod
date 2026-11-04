@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "destCityId": "city-b",
+  "resourceId": "Steel",
+  "offers": [
+    {
+      "originKind": "City",
+      "originCityId": "city-a",
+      "worldGatewayEndpointKey": null,
+      "path": ["ab-rail-01"],
+      "eligible": true,
+      "excludedReason": null,
+      "producerPrice": 100,
+      "freight": 34,
+      "tariff": 0,
+      "subsidy": 0,
+      "landedPrice": 134,
+      "supplierSnapshot": { "cityId": "city-a", "seq": 1, "regionSeq": 1 },
+      "effectiveRegionalOfferPerGameDay": 300
+    },
+    {
+      "originKind": "City",
+      "originCityId": "city-c",
+      "worldGatewayEndpointKey": null,
+      "path": [],
+      "eligible": false,
+      "excludedReason": "NoPath",
+      "producerPrice": null,
+      "freight": null,
+      "tariff": null,
+      "subsidy": null,
+      "landedPrice": null,
+      "supplierSnapshot": { "cityId": "city-c", "seq": 1, "regionSeq": 3 },
+      "effectiveRegionalOfferPerGameDay": null
+    },
+    {
+      "originKind": "World",
+      "originCityId": null,
+      "worldGatewayEndpointKey": "oc-road-south-01",
+      "path": [],
+      "eligible": true,
+      "excludedReason": null,
+      "producerPrice": 128,
+      "freight": 12,
+      "tariff": 0,
+      "subsidy": 0,
+      "landedPrice": 140,
+      "supplierSnapshot": null,
+      "effectiveRegionalOfferPerGameDay": null
+    }
+  ],
+  "selectedOfferIndex": 0,
+  "reportedAs": "ModeledPriceQuoteNotPhysicalTrade",
+  "appliedToGame": false,
+  "provenance": {
+    "engineVersion": "golden",
+    "regionId": "region-golden-v1",
+    "manifestRevision": 1,
+    "currentRegionSeq": 3,
+    "inputsSha256": null,
+    "traceId": "city-b/Steel/m1/r3"
+  }
+}

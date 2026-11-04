@@ -1,0 +1,5 @@
+* text=auto eol=lf
+# Golden files are hashed byte-for-byte (Contracts/README.md). Never convert line endings.
+Contracts/golden/** -text
+*.png binary
+*.cok binary

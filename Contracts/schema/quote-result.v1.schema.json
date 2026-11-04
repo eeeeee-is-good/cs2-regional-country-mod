@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regions.local/schema/quote-result.v1.schema.json",
+  "title": "QuoteResult v1",
+  "description": "Modeled landed-cost quote with explanation. Not a shipment, sale or payment.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "destCityId", "resourceId", "offers", "selectedOfferIndex", "reportedAs", "appliedToGame", "provenance"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "destCityId": { "$ref": "common.v1.schema.json#/$defs/id" },
+    "resourceId": { "$ref": "common.v1.schema.json#/$defs/id" },
+    "offers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["originKind", "originCityId", "worldGatewayEndpointKey", "path", "eligible", "excludedReason", "producerPrice", "freight", "tariff", "subsidy", "landedPrice", "supplierSnapshot", "effectiveRegionalOfferPerGameDay"],
+        "properties": {
+          "originKind": { "$ref": "common.v1.schema.json#/$defs/originKind" },
+          "originCityId": { "anyOf": [{ "$ref": "common.v1.schema.json#/$defs/id" }, { "type": "null" }] },
+          "worldGatewayEndpointKey": { "type": ["string", "null"] },
+          "path": { "type": "array", "items": { "$ref": "common.v1.schema.json#/$defs/id" } },
+          "eligible": { "type": "boolean" },
+          "excludedReason": { "anyOf": [{ "$ref": "common.v1.schema.json#/$defs/excludedReason" }, { "type": "null" }] },
+          "producerPrice": { "$ref": "common.v1.schema.json#/$defs/nonNegNumberOrNull" },
+          "freight": { "$ref": "common.v1.schema.json#/$defs/nonNegNumberOrNull" },
+          "tariff": { "$ref": "common.v1.schema.json#/$defs/nonNegNumberOrNull" },
+          "subsidy": { "$ref": "common.v1.schema.json#/$defs/nonNegNumberOrNull" },
+          "landedPrice": { "$ref": "common.v1.schema.json#/$defs/nonNegNumberOrNull" },
+          "supplierSnapshot": {
+            "anyOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["cityId", "seq", "regionSeq"],
+                "properties": {
+                  "cityId": { "$ref": "common.v1.schema.json#/$defs/id" },
+                  "seq": { "type": "integer", "minimum": 1 },
+                  "regionSeq": { "type": "integer", "minimum": 1 }
+                }
+              }
+            ]
+          },
+          "effectiveRegionalOfferPerGameDay": { "type": ["number", "null"] }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "eligible": { "const": true } } },
+            "then": { "properties": { "excludedReason": { "type": "null" }, "landedPrice": { "type": "number" } } },
+            "else": { "properties": { "excludedReason": { "not": { "type": "null" } } } }
+          },
+          {
+            "if": { "properties": { "originKind": { "const": "City" } } },
+            "then": { "properties": { "originCityId": { "type": "string" }, "worldGatewayEndpointKey": { "type": "null" } } },
+            "else": { "properties": { "originCityId": { "type": "null" } } }
+          }
+        ]
+      }
+    },
+    "selectedOfferIndex": { "type": ["integer", "null"], "minimum": 0 },
+    "reportedAs": { "$ref": "common.v1.schema.json#/$defs/reportedAs" },
+    "appliedToGame": { "type": "boolean" },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engineVersion", "regionId", "manifestRevision", "currentRegionSeq", "inputsSha256", "traceId"],
+      "properties": {
+        "engineVersion": { "type": "string" },
+        "regionId": { "$ref": "common.v1.schema.json#/$defs/id" },
+        "manifestRevision": { "type": "integer", "minimum": 1 },
+        "currentRegionSeq": { "type": "integer", "minimum": 0 },
+        "inputsSha256": { "anyOf": [{ "$ref": "common.v1.schema.json#/$defs/sha256" }, { "type": "null" }] },
+        "traceId": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

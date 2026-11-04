@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "cityId": "city-c",
+  "seq": 1,
+  "parentSeq": null,
+  "producer": {
+    "tool": "CitySimulator",
+    "toolVersion": "golden",
+    "gameBuild": null,
+    "capabilityReportSha256": null
+  },
+  "profiles": {
+    "map": "Unknown",
+    "economy": "Unknown",
+    "mobility": "Unknown",
+    "occupancy": "Unknown",
+    "companyControl": "Unknown",
+    "factoryProduction": "Unknown",
+    "settingsFingerprint": null
+  },
+  "gameTime": { "gameDays": 30, "rawTick": null },
+  "measurementWindowGameHours": 168,
+  "resources": [
+    {
+      "resourceId": "Steel",
+      "realizedOutputPerGameDay": 5000,
+      "inputUsePerGameDay": 100,
+      "capacityEstimatePerGameDay": 6000,
+      "producerCompanyCount": 12,
+      "confidence": "Validated",
+      "source": "synthetic; large cheap supplier with no route, must not influence city-b (G01)"
+    }
+  ],
+  "outsideConnections": [
+    {
+      "endpointKey": "oc-road-north-01",
+      "kind": "Transport",
+      "transportModes": ["Road"],
+      "positionMetres": null,
+      "carriesCargo": true,
+      "carriesPassengers": true
+    }
+  ],
+  "exportedAtUtc": null
+}

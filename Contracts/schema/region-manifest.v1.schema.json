@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regions.local/schema/region-manifest.v1.schema.json",
+  "title": "RegionManifest v1",
+  "description": "Region membership, freeform placement, links and model parameters. Parameter values are arbitrary test inputs, not game constants.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "regionId", "revision", "cities", "links", "worldGateways", "parameters"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "regionId": { "$ref": "common.v1.schema.json#/$defs/id" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "cities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["cityId", "displayName", "saveRef", "placement"],
+        "properties": {
+          "cityId": { "$ref": "common.v1.schema.json#/$defs/id" },
+          "displayName": { "type": "string", "minLength": 1 },
+          "saveRef": { "type": ["string", "null"] },
+          "placement": {
+            "anyOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["originXMetres", "originYMetres", "sizeXMetres", "sizeYMetres", "rotationDegrees", "mapProfile"],
+                "properties": {
+                  "originXMetres": { "type": "number" },
+                  "originYMetres": { "type": "number" },
+                  "sizeXMetres": { "type": "number", "exclusiveMinimum": 0 },
+                  "sizeYMetres": { "type": "number", "exclusiveMinimum": 0 },
+                  "rotationDegrees": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 },
+                  "mapProfile": { "$ref": "common.v1.schema.json#/$defs/mapProfile" }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["linkId", "a", "b", "mode", "distanceKm", "bidirectional", "status"],
+        "properties": {
+          "linkId": { "$ref": "common.v1.schema.json#/$defs/id" },
+          "a": { "$ref": "#/$defs/endpointRef" },
+          "b": { "$ref": "#/$defs/endpointRef" },
+          "mode": { "$ref": "common.v1.schema.json#/$defs/transportMode" },
+          "distanceKm": { "type": "number", "minimum": 0 },
+          "bidirectional": { "type": "boolean" },
+          "status": { "$ref": "common.v1.schema.json#/$defs/linkStatus" }
+        }
+      }
+    },
+    "worldGateways": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["cityId", "endpointKey", "mode", "distanceKm"],
+        "properties": {
+          "cityId": { "$ref": "common.v1.schema.json#/$defs/id" },
+          "endpointKey": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "mode": { "$ref": "common.v1.schema.json#/$defs/transportMode" },
+          "distanceKm": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["modeCosts", "resourcePrices", "staleness"],
+      "properties": {
+        "modeCosts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["mode", "fixedCost", "costPerKm"],
+            "properties": {
+              "mode": { "$ref": "common.v1.schema.json#/$defs/transportMode" },
+              "fixedCost": { "type": "number", "minimum": 0 },
+              "costPerKm": { "type": "number", "minimum": 0 }
+            }
+          }
+        },
+        "resourcePrices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["resourceId", "regionalProducerPriceIndex", "worldProducerPriceIndex"],
+            "properties": {
+              "resourceId": { "$ref": "common.v1.schema.json#/$defs/id" },
+              "regionalProducerPriceIndex": { "type": "number", "minimum": 0 },
+              "worldProducerPriceIndex": { "type": "number", "minimum": 0 }
+            }
+          }
+        },
+        "staleness": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maxRegionSeqAge"],
+          "properties": { "maxRegionSeqAge": { "type": ["integer", "null"], "minimum": 0 } }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "endpointRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cityId", "endpointKey"],
+      "properties": {
+        "cityId": { "$ref": "common.v1.schema.json#/$defs/id" },
+        "endpointKey": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    }
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "cityId": "city-a",
+  "seq": 1,
+  "parentSeq": null,
+  "producer": {
+    "tool": "CitySimulator",
+    "toolVersion": "golden",
+    "gameBuild": null,
+    "capabilityReportSha256": null
+  },
+  "profiles": {
+    "map": "Vanilla",
+    "economy": "Vanilla",
+    "mobility": "Vanilla",
+    "occupancy": "Vanilla",
+    "companyControl": "Vanilla",
+    "factoryProduction": "Vanilla",
+    "settingsFingerprint": null
+  },
+  "gameTime": { "gameDays": 120, "rawTick": null },
+  "measurementWindowGameHours": 168,
+  "resources": [
+    {
+      "resourceId": "Steel",
+      "realizedOutputPerGameDay": 1000,
+      "inputUsePerGameDay": 700,
+      "capacityEstimatePerGameDay": 1200,
+      "producerCompanyCount": 4,
+      "confidence": "Validated",
+      "source": "synthetic"
+    }
+  ],
+  "outsideConnections": [
+    {
+      "endpointKey": "oc-power-north-01",
+      "kind": "Electricity",
+      "transportModes": [],
+      "positionMetres": null,
+      "carriesCargo": null,
+      "carriesPassengers": null
+    },
+    {
+      "endpointKey": "oc-rail-east-01",
+      "kind": "Transport",
+      "transportModes": ["Rail"],
+      "positionMetres": { "x": 7168, "y": 48.5, "z": 2200 },
+      "carriesCargo": true,
+      "carriesPassengers": true
+    },
+    {
+      "endpointKey": "oc-road-east-01",
+      "kind": "Transport",
+      "transportModes": ["Road"],
+      "positionMetres": { "x": 7168, "y": 52, "z": -1200 },
+      "carriesCargo": true,
+      "carriesPassengers": true
+    }
+  ],
+  "exportedAtUtc": null
+}

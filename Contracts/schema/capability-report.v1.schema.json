@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regions.local/schema/capability-report.v1.schema.json",
+  "title": "CapabilityReport v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "gameBuild", "modVersion", "activeMods", "activeModsEnumerated", "features", "verifiedAssumptions", "warnings"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "gameBuild": { "type": ["string", "null"] },
+    "modVersion": { "type": "string", "minLength": 1 },
+    "activeMods": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "version"],
+        "properties": { "id": { "type": "string", "minLength": 1 }, "version": { "type": ["string", "null"] } }
+      }
+    },
+    "activeModsEnumerated": { "type": "boolean" },
+    "features": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["feature", "status", "reason"],
+        "properties": {
+          "feature": { "$ref": "common.v1.schema.json#/$defs/feature" },
+          "status": { "$ref": "common.v1.schema.json#/$defs/featureStatus" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "verifiedAssumptions": { "type": "array", "items": { "type": "string", "pattern": "^V-[0-9]{2}$" } },
+    "warnings": { "type": "array", "items": { "type": "string" } }
+  }
+}

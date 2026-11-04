@@ -1,0 +1,15 @@
+# Build output
+bin/
+obj/
+*.user
+.vs/
+.idea/
+TestResults/
+
+# Never commit saves or region runtime data (CLAUDE.md "Safety")
+*.cok
+*.cok.cid
+saves/
+RegionRoot/
+testlogs/**/*.json.gz
+*.log

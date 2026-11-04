@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regions.local/schema/store-index.v1.schema.json",
+  "title": "StoreIndex v1",
+  "description": "Written only by RegionStore on ingestion. Exporters read it to pick the next seq.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "regionId", "currentRegionSeq", "snapshots"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "regionId": { "$ref": "common.v1.schema.json#/$defs/id" },
+    "currentRegionSeq": { "type": "integer", "minimum": 0 },
+    "snapshots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["cityId", "seq", "regionSeq", "fileSha256"],
+        "properties": {
+          "cityId": { "$ref": "common.v1.schema.json#/$defs/id" },
+          "seq": { "type": "integer", "minimum": 1 },
+          "regionSeq": { "type": "integer", "minimum": 1 },
+          "fileSha256": { "$ref": "common.v1.schema.json#/$defs/sha256" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "description": "Project-owned resource ids. 'gameName' is the expected CS2 identifier and is UNVERIFIED until V-10 is closed. Add resources only when a task needs them; do not guess the full 36-resource list.",
+  "resources": [
+    {
+      "resourceId": "Steel",
+      "gameName": "Steel",
+      "gameNameVerified": false,
+      "category": "Material",
+      "weightless": false,
+      "allowedFreightModes": ["Road", "Rail", "Ship"],
+      "notes": "Prototype 0 resource (log §19.2 'Resource producer'). Air excluded for bulk in v1 as a model choice, not a game rule."
+    }
+  ]
+}

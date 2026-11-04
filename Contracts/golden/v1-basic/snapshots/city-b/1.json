@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "cityId": "city-b",
+  "seq": 1,
+  "parentSeq": null,
+  "producer": {
+    "tool": "CitySimulator",
+    "toolVersion": "golden",
+    "gameBuild": null,
+    "capabilityReportSha256": null
+  },
+  "profiles": {
+    "map": "Vanilla",
+    "economy": "Unknown",
+    "mobility": "Unknown",
+    "occupancy": "Unknown",
+    "companyControl": "Unknown",
+    "factoryProduction": "Unknown",
+    "settingsFingerprint": null
+  },
+  "gameTime": { "gameDays": null, "rawTick": null },
+  "measurementWindowGameHours": null,
+  "resources": [
+    {
+      "resourceId": "Steel",
+      "realizedOutputPerGameDay": 0,
+      "inputUsePerGameDay": 500,
+      "capacityEstimatePerGameDay": null,
+      "producerCompanyCount": 0,
+      "confidence": "Provisional",
+      "source": "synthetic; zero output is a measured zero, null capacity is unknown"
+    }
+  ],
+  "outsideConnections": [
+    {
+      "endpointKey": "oc-rail-west-01",
+      "kind": "Transport",
+      "transportModes": ["Rail"],
+      "positionMetres": { "x": -7168, "y": 48.5, "z": 2200 },
+      "carriesCargo": true,
+      "carriesPassengers": null
+    },
+    {
+      "endpointKey": "oc-road-south-01",
+      "kind": "Transport",
+      "transportModes": ["Road"],
+      "positionMetres": { "x": 300, "y": 20, "z": -7168 },
+      "carriesCargo": true,
+      "carriesPassengers": true
+    },
+    {
+      "endpointKey": "oc-road-west-01",
+      "kind": "Transport",
+      "transportModes": ["Road"],
+      "positionMetres": { "x": -7168, "y": 52, "z": -1200 },
+      "carriesCargo": true,
+      "carriesPassengers": true
+    },
+    {
+      "endpointKey": "oc-water-west-01",
+      "kind": "Water",
+      "transportModes": [],
+      "positionMetres": null,
+      "carriesCargo": null,
+      "carriesPassengers": null
+    }
+  ],
+  "exportedAtUtc": "2026-11-04T12:00:00Z"
+}

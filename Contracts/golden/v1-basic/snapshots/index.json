@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "regionId": "region-golden-v1",
+  "currentRegionSeq": 3,
+  "snapshots": [
+    { "cityId": "city-a", "seq": 1, "regionSeq": 1, "fileSha256": "fd5301022582fa569d21283e0e41be6e8afa3c3690acad1d3a82a8e6a5140c74" },
+    { "cityId": "city-b", "seq": 1, "regionSeq": 2, "fileSha256": "f8f11bba9555f22f2c47d18041bd632d9abf7a51748babdeaefad8df6f1e6dde" },
+    { "cityId": "city-c", "seq": 1, "regionSeq": 3, "fileSha256": "497c1c8862bb4f2816c67be3e5768e26fab64f9240462d2c3d950cb57c8d751f" }
+  ]
+}
