@@ -66,7 +66,7 @@ public static class Cli
                     for (var i = 0; i < quotes.Count; i++)
                     {
                         if (i > 0) stdout.Write("\n");
-                        stdout.Write(TextReport.Quote(quotes[i], state.Manifest));
+                        stdout.Write(TextReport.Quote(quotes[i], state));
                         if (options.TryGetValue("json", out var outDir)) RegionFolder.WriteQuote(quotes[i], outDir);
                     }
                     return Ok;

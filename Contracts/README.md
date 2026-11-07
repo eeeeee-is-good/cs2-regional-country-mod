@@ -78,12 +78,18 @@ Hashes are lowercase hex SHA-256 of the **exact file bytes**. Hashing happens at
 - World offer: `producerPrice = worldProducerPriceIndex`, `freight = fixedCost + costPerKm × gateway.distanceKm`.
 - A link mode is usable for a resource only if it is in that resource's `allowedFreightModes`. Utility connections are never freight.
 - When an offer has several exclusion reasons, report the first in this order: `UnknownResource` → `NoPath` / `ModeIncompatible` → `StaleSnapshot` → `UnknownSupply` → `NoSupply`.
-- `effectiveRegionalOfferPerGameDay = min(output − inputUse, capacity) × confidenceFactor`, where `confidenceFactor(Validated) = 1.0`. The factors for `Provisional`/`Unknown`, and how a null capacity is handled, are **decided in A4** and documented here when merged.
+- `effectiveRegionalOfferPerGameDay = min(output − inputUse, capacity) × confidenceFactor × penalties` (decided in A4, engine 0.2.0, `RegionalEngine/src/SupplyRule.cs`). Unverified data is downgraded, not excluded (log §25.3):
+  - `confidence: Unknown`, or `output` null → `UnknownSupply` (nothing trustworthy was measured; null is never zero).
+  - `confidenceFactor`: `Validated` 1.0, `Provisional` 0.5.
+  - `inputUse` null → the surplus is unknown, so `output` replaces `output − inputUse`, with a ×0.5 penalty.
+  - `capacity` null → no capacity cap, with a ×0.5 penalty.
+  - Result ≤ 0 → `NoSupply`. `UnknownSupply` takes precedence over `NoSupply`.
+  - In v1 this quantity only decides eligibility and is reported; it never changes a price. So there is no age decay: staleness is the `maxRegionSeqAge` cut-off.
 - `selectedOfferIndex` points to the lowest eligible `landedPrice`; a tie goes to the earlier offer. It is `null` when nothing is eligible.
 - Offer order: City offers by `originCityId`, then World offers by gateway `endpointKey`.
 
 ## Open items to settle in review
 
-- Whether `MaxRegionSeqAge` (staleness counted in ingestions, not in city clocks) is the right rule. Developer A may replace it in A4.
+- ~~Whether `MaxRegionSeqAge` is the right rule.~~ **Kept in A4 (2026-11-06):** it is the only staleness signal that never compares independent city clocks. Revisit if quantities start to affect prices (then add age decay to the effective offer).
 - Whether `CitySnapshot` needs `saveLineageId` before V-15 is verified. Currently it doesn't; lineage is checked through `seq`/`parentSeq`/`gameDays`.
 - The coordinate convention of `positionMetres` (V-28). Golden values assume map-centred x/z with y up, and that is a guess.

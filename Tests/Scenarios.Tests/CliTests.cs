@@ -53,6 +53,14 @@ public sealed class CliTests : IDisposable
     }
 
     [Fact]
+    public void Quote_output_explains_supply_downgrades()
+    {
+        var r = Run("quote", Golden, "--dest", "city-a");
+        Assert.Equal(Cli.Ok, r.Code);
+        Assert.Contains("excluded: no spare supply (-125.00/day) (provisional x0.5, capacity unknown x0.5)", r.Out);
+    }
+
+    [Fact]
     public void Quote_output_is_identical_on_every_run()
     {
         Assert.Equal(Run("quote", Golden).Out, Run("quote", Golden).Out);
