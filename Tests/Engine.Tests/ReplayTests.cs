@@ -13,6 +13,25 @@ public class ReplayTests
         for (var i = 0; i < 5; i++) Assert.Equal(first, Q.Bytes(Fixture.GoldenBasic().Quote()));
     }
 
+    /// <summary>
+    /// Criterion 2 across machines: CI runs this on Windows, Linux and macOS, and every OS must produce
+    /// exactly these bytes. Update the pins only for an intended change to the engine or its inputs
+    /// (an EngineVersion bump changes the quote bytes, a fixture change changes both).
+    /// </summary>
+    [Fact]
+    public void Golden_quote_bytes_are_pinned()
+    {
+        var q = Fixture.GoldenBasic().Quote();
+        // The persisted form (Contracts rule 1: LF). Raw System.Text.Json output in .NET 8 uses the OS newline.
+        var fileBytes = Regions.Store.ContractJson.ToBytes(q);
+        var quoteSha = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(fileBytes)).ToLowerInvariant();
+        Assert.True(PinnedGoldenInputsSha256 == q.Provenance.InputsSha256, $"inputsSha256 is {q.Provenance.InputsSha256}");
+        Assert.True(PinnedGoldenQuoteSha256 == quoteSha, $"quote file sha256 is {quoteSha}");
+    }
+
+    private const string PinnedGoldenInputsSha256 = "b66d28317f3fb29cd02c26480ff9734cbb8540c93892a349686747d67f157f14";
+    private const string PinnedGoldenQuoteSha256 = "e4e53d55cba6d10d11348707547a1c324a87f150b7e2a32f0168cb1ecb2a7996";
+
     [Fact]
     public void Input_order_does_not_change_a_single_byte()
     {
