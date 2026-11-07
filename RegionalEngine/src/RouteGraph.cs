@@ -40,11 +40,8 @@ namespace Regions.Engine
             var costs = manifest.Parameters.ModeCosts.ToDictionary(c => c.Mode);
             foreach (var link in manifest.Links.OrderBy(l => l.LinkId, StringComparer.Ordinal))
             {
-                if (link.Status != LinkStatus.Proposed && link.Status != LinkStatus.Verified) continue;
-                if (!costs.TryGetValue(link.Mode, out var c)) continue;
-                if (!EndpointCarries(latest, link.A.CityId, link.A.EndpointKey, link.Mode)) continue;
-                if (!EndpointCarries(latest, link.B.CityId, link.B.EndpointKey, link.Mode)) continue;
-
+                if (!LinkUsable(link, costs, latest)) continue;
+                var c = costs[link.Mode];
                 var cost = c.FixedCost + c.CostPerKm * link.DistanceKm;
                 if (!Num.IsFinite(cost))
                     throw new RegionStateException(new[] { $"links[{link.LinkId}]: freight cost overflows (distance {link.DistanceKm} km)" });
@@ -54,6 +51,13 @@ namespace Regions.Engine
                     _edges.Add(new Edge(link.B.CityId, link.A.CityId, link.LinkId, link.Mode, cost));
             }
         }
+
+        /// <summary>The link usability rule described on this class. Shared with InvariantChecker.</summary>
+        public static bool LinkUsable(LinkEntry link, IReadOnlyDictionary<TransportMode, ModeCost> costs, IReadOnlyDictionary<string, PublishedSnapshot> latest) =>
+            (link.Status == LinkStatus.Proposed || link.Status == LinkStatus.Verified)
+            && costs.ContainsKey(link.Mode)
+            && EndpointCarries(latest, link.A.CityId, link.A.EndpointKey, link.Mode)
+            && EndpointCarries(latest, link.B.CityId, link.B.EndpointKey, link.Mode);
 
         /// <summary>True if the city's latest snapshot has a Transport connection with this key that lists the mode.</summary>
         public static bool EndpointCarries(IReadOnlyDictionary<string, PublishedSnapshot> latest, string cityId, string endpointKey, TransportMode mode)

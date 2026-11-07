@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Command-line integration point before any UI (ARCHITECTURE.md §3, PROTOTYPE_PLAN A6). Runs outside the game. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Regions.ScenarioRunner</RootNamespace>
+    <AssemblyName>regions</AssemblyName>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Same pinned version as the test projects. Validates inputs against Contracts/schema. -->
+    <PackageReference Include="JsonSchema.Net" Version="7.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Contracts\Contracts.csproj" />
+    <ProjectReference Include="..\RegionalEngine\RegionalEngine.csproj" />
+    <ProjectReference Include="..\CitySimulator\CitySimulator.csproj" />
+  </ItemGroup>
+
+</Project>
