@@ -21,7 +21,8 @@ namespace Regions.Engine
     /// </summary>
     public sealed class LandedCostEngine : IRegionalEngine
     {
-        public const string EngineVersion = "0.1.0-a3";
+        /// <summary>0.2.0: A4 supply rule (Provisional and missing figures are downgraded instead of excluded).</summary>
+        public const string EngineVersion = "0.2.0";
 
         private static readonly TransportMode[] AllModes =
             (TransportMode[])System.Enum.GetValues(typeof(TransportMode));

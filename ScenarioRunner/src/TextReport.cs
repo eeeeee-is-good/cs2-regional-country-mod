@@ -8,9 +8,17 @@ namespace Regions.ScenarioRunner;
 /// <summary>Human-readable "Why this price?" output (log §18.7). Deterministic: no clock, invariant culture.</summary>
 public static class TextReport
 {
-    public static string Quote(QuoteResult q, RegionManifest manifest)
+    public static string Quote(QuoteResult q, RegionState state)
     {
+        var manifest = state.Manifest;
         var names = manifest.Cities.ToDictionary(c => c.CityId, c => string.IsNullOrEmpty(c.DisplayName) ? c.CityId : c.DisplayName);
+        string SupplyNotes(Offer o)
+        {
+            var obs = state.LatestSnapshots.FirstOrDefault(p => p.Snapshot.CityId == o.OriginCityId)?
+                .Snapshot.Resources.FirstOrDefault(r => r.ResourceId == q.ResourceId);
+            var notes = obs == null ? new List<string>() : SupplyRule.Evaluate(obs).Notes;
+            return notes.Count == 0 ? "" : " (" + string.Join(", ", notes) + ")";
+        }
         string Name(string? id) => id != null && names.TryGetValue(id, out var n) ? n : id ?? "?";
 
         var sb = new StringBuilder();
@@ -34,7 +42,8 @@ public static class TextReport
             rows.Add(new[]
             {
                 q.SelectedOfferIndex == i ? ">" : "", i.ToString(CultureInfo.InvariantCulture), origin, route,
-                N(o.ProducerPrice), N(o.Freight), N(o.Tariff), N(o.Subsidy), N(o.LandedPrice), Result(o, q.ResourceId),
+                N(o.ProducerPrice), N(o.Freight), N(o.Tariff), N(o.Subsidy), N(o.LandedPrice),
+                Result(o, q.ResourceId) + (o.OriginKind == OriginKind.City && (o.Eligible || o.ExcludedReason is ExcludedReason.NoSupply or ExcludedReason.UnknownSupply) ? SupplyNotes(o) : ""),
             });
         }
         var widths = Enumerable.Range(0, rows[0].Length).Select(c => rows.Max(r => r[c].Length)).ToArray();
@@ -86,7 +95,7 @@ public static class TextReport
             ExcludedReason.NoPath => "excluded: no usable route",
             ExcludedReason.ModeIncompatible => $"excluded: routes exist, but none in a mode allowed for {resourceId}",
             ExcludedReason.StaleSnapshot => "excluded: supplier snapshot too old",
-            ExcludedReason.UnknownSupply => "excluded: supply unknown (not validated, or data missing)",
+            ExcludedReason.UnknownSupply => "excluded: supply unknown",
             ExcludedReason.NoSupply => $"excluded: no spare supply ({N(o.EffectiveRegionalOfferPerGameDay)}/day)",
             ExcludedReason.NoWorldGateway => "excluded: gateway not usable",
             ExcludedReason.UnknownResource => "excluded: unknown resource or no price set",

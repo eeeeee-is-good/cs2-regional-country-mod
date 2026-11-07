@@ -255,17 +255,17 @@ public class ScenarioTests
         Assert.True(f.Quote().From("city-a").Eligible);
     }
 
-    // ---- Supply (interim rule until A4) ----
+    // ---- Supply (A4 rule, SupplyRule.cs) ----
 
     [Theory]
-    [InlineData(Confidence.Provisional, 1000.0, 700.0, 1200.0, ExcludedReason.UnknownSupply, null)]
     [InlineData(Confidence.Unknown, 1000.0, 700.0, 1200.0, ExcludedReason.UnknownSupply, null)]
     [InlineData(Confidence.Validated, null, 700.0, 1200.0, ExcludedReason.UnknownSupply, null)]
-    [InlineData(Confidence.Validated, 1000.0, null, 1200.0, ExcludedReason.UnknownSupply, null)]
-    [InlineData(Confidence.Validated, 1000.0, 700.0, null, ExcludedReason.UnknownSupply, null)]
+    [InlineData(Confidence.Provisional, null, null, null, ExcludedReason.UnknownSupply, null)]
     [InlineData(Confidence.Validated, 700.0, 700.0, 1200.0, ExcludedReason.NoSupply, 0.0)]
     [InlineData(Confidence.Validated, 500.0, 700.0, 1200.0, ExcludedReason.NoSupply, -200.0)]
     [InlineData(Confidence.Validated, 1000.0, 700.0, 0.0, ExcludedReason.NoSupply, 0.0)]
+    [InlineData(Confidence.Provisional, 0.0, 500.0, null, ExcludedReason.NoSupply, -125.0)] // deficit stays a deficit when downgraded
+    [InlineData(Confidence.Validated, 0.0, null, null, ExcludedReason.NoSupply, 0.0)]      // measured zero output
     public void Supply_exclusions(Confidence confidence, double? output, double? inputUse, double? capacity,
                                   ExcludedReason reason, double? effective)
     {
@@ -276,6 +276,37 @@ public class ScenarioTests
         var a = f.Quote().From("city-a");
         Q.AssertExcluded(a, reason);
         Assert.Equal(effective, a.EffectiveRegionalOfferPerGameDay);
+    }
+
+    /// <summary>Unverified data is downgraded, not excluded (log §25.3). Golden city-a: output 1000, use 700, capacity 1200.</summary>
+    [Theory]
+    [InlineData(Confidence.Validated, 1000.0, 700.0, 1200.0, 300.0)]   // min(300, 1200) x 1
+    [InlineData(Confidence.Provisional, 1000.0, 700.0, 1200.0, 150.0)] // x0.5 provisional
+    [InlineData(Confidence.Validated, 1000.0, null, 1200.0, 500.0)]    // base = min(output 1000, 1200) x0.5 use unknown
+    [InlineData(Confidence.Validated, 1000.0, 700.0, null, 150.0)]     // base = surplus 300 x0.5 capacity unknown
+    [InlineData(Confidence.Validated, 1000.0, null, null, 250.0)]      // base = output 1000 x0.5 x0.5
+    [InlineData(Confidence.Provisional, 1000.0, null, null, 125.0)]    // x0.5 x0.5 x0.5
+    [InlineData(Confidence.Validated, 1000.0, null, 400.0, 200.0)]     // capacity still caps when use is unknown
+    public void Supply_downgrades_keep_the_supplier_eligible(Confidence confidence, double? output, double? inputUse, double? capacity, double effective)
+    {
+        var f = Fixture.GoldenBasic();
+        var steel = f.Steel("city-a");
+        (steel.Confidence, steel.RealizedOutputPerGameDay, steel.InputUsePerGameDay, steel.CapacityEstimatePerGameDay) =
+            (confidence, output, inputUse, capacity);
+        var a = f.Quote().From("city-a");
+        Q.AssertEligible(a, 134, "ab-rail-01"); // supply never changes the price in v1
+        Assert.Equal(effective, a.EffectiveRegionalOfferPerGameDay!.Value, 9);
+    }
+
+    [Fact]
+    public void Supply_notes_explain_every_factor()
+    {
+        var notes = SupplyRule.Evaluate(new ResourceObservation
+        {
+            ResourceId = "Steel", RealizedOutputPerGameDay = 1000, Confidence = Confidence.Provisional,
+        }).Notes;
+        Assert.Equal(new[] { "provisional x0.5", "local use unknown x0.5", "capacity unknown x0.5" }, notes);
+        Assert.Empty(SupplyRule.Evaluate(Fixture.GoldenBasic().Steel("city-a")).Notes);
     }
 
     [Fact]
@@ -313,8 +344,8 @@ public class ScenarioTests
     public void Precedence_UnknownSupply_beats_NoSupply()
     {
         var f = Fixture.GoldenBasic();
-        f.Steel("city-a").RealizedOutputPerGameDay = 0; // would be NoSupply
-        f.Steel("city-a").CapacityEstimatePerGameDay = null;
+        f.Steel("city-a").InputUsePerGameDay = 5000;      // would be a deficit (NoSupply)
+        f.Steel("city-a").Confidence = Confidence.Unknown; // but the figures are untrusted
         Q.AssertExcluded(f.Quote().From("city-a"), ExcludedReason.UnknownSupply);
     }
 
