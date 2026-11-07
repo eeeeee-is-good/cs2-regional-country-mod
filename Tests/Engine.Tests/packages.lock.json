@@ -145,6 +145,14 @@
         "dependencies": {
           "Regions.Contracts": "[1.0.0, )"
         }
+      },
+      "Regions.RegionStore": {
+        "type": "Project",
+        "dependencies": {
+          "JsonSchema.Net": "[7.4.0, )",
+          "Regions.Contracts": "[1.0.0, )",
+          "Regions.RegionalEngine": "[1.0.0, )"
+        }
       }
     }
   }

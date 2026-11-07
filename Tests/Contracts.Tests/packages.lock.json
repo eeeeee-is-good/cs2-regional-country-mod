@@ -139,6 +139,20 @@
       },
       "Regions.Contracts": {
         "type": "Project"
+      },
+      "Regions.RegionalEngine": {
+        "type": "Project",
+        "dependencies": {
+          "Regions.Contracts": "[1.0.0, )"
+        }
+      },
+      "Regions.RegionStore": {
+        "type": "Project",
+        "dependencies": {
+          "JsonSchema.Net": "[7.4.0, )",
+          "Regions.Contracts": "[1.0.0, )",
+          "Regions.RegionalEngine": "[1.0.0, )"
+        }
       }
     }
   }

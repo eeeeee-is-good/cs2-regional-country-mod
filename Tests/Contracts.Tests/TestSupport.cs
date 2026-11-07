@@ -5,19 +5,10 @@ using Json.Schema;
 
 namespace Regions.Contracts.Tests;
 
-/// <summary>Engine-side serializer settings implementing Contracts/README.md "Serialization rules".
-/// Temporary home; RegionStore (A2) will own the production copy.</summary>
+/// <summary>Test helpers over the production serializer settings, which RegionStore owns (Regions.Store.ContractJson).</summary>
 public static class ContractJson
 {
-    public static readonly JsonSerializerOptions Options = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.Never,     // rule 3: write explicit nulls
-        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
-        NumberHandling = JsonNumberHandling.Strict,             // rule 4: no NaN/Infinity strings
-        WriteIndented = true,
-        Converters = { new JsonStringEnumConverter(namingPolicy: null, allowIntegerValues: false) }, // rule 2
-    };
+    public static readonly JsonSerializerOptions Options = Regions.Store.ContractJson.Options;
 
     public static T Read<T>(string path) =>
         JsonSerializer.Deserialize<T>(File.ReadAllText(path), Options)

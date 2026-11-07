@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Contracts\Contracts.csproj" />
+    <ProjectReference Include="..\..\RegionStore\RegionStore.csproj" />
     <ProjectReference Include="..\..\RegionalEngine\RegionalEngine.csproj" />
     <ProjectReference Include="..\..\CitySimulator\CitySimulator.csproj" />
     <ProjectReference Include="..\..\ScenarioRunner\ScenarioRunner.csproj" />

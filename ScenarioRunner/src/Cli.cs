@@ -1,6 +1,7 @@
 using Regions.Contracts;
 using Regions.Engine;
 using Regions.Simulator;
+using Regions.Store;
 
 namespace Regions.ScenarioRunner;
 
@@ -22,10 +23,11 @@ public static class Cli
             --resource <id>                       Only this resource (default: every resource seen).
             --json <outFolder>                    Also write quote.<dest>.<resource>.json files.
           regions check <folder>                Quote everything and check the log §18.4 invariants.
+          regions ingest <folder>               Accept new snapshot files from <folder>/inbox and report conflicts.
 
           --resources <file>                    Resource table to use (default: the bundled resource-ids.v1.json).
 
-        A region folder holds manifest.json, snapshots/index.json and snapshots/<cityId>/<seq>.json
+        A region folder holds manifest.json, inbox/, snapshots/index.json and snapshots/<cityId>/<seq>.json
         (Contracts/README.md "Region store layout"). Contracts/golden/v1-basic is one.
         Quotes are modeled price signals. Nothing here reads or writes a game save.
         """;
@@ -79,12 +81,24 @@ public static class Cli
                     return report.Passed ? Ok : CheckFailed;
                 }
 
+                case "ingest":
+                {
+                    Require(positional, 2, "regions ingest <folder>");
+                    var result = FileRegionStore.Open(positional[1]).IngestInbox();
+                    if (result.Outcomes.Count == 0) stdout.Write("Inbox is empty.\n");
+                    foreach (var o in result.Outcomes) stdout.Write("  " + o + "\n");
+                    stdout.Write($"{result.Accepted} accepted. Region is at regionSeq {result.CurrentRegionSeq}.\n");
+                    if (result.HasProblems)
+                        stdout.Write("Conflicts and rejected files are never resolved automatically. Inbox files are left in place; remove or replace them yourself.\n");
+                    return result.HasProblems ? CheckFailed : Ok;
+                }
+
                 default:
                     stderr.Write($"Unknown command '{positional[0]}'.\n\n{Usage.Replace("\r\n", "\n")}\n");
                     return UsageOrInputError;
             }
         }
-        catch (Exception ex) when (ex is RegionFolderException or RegionStateException or UsageException or ArgumentException or IOException)
+        catch (Exception ex) when (ex is StoreException or RegionStateException or UsageException or ArgumentException or IOException)
         {
             stderr.Write("error: " + ex.Message + "\n");
             return UsageOrInputError;

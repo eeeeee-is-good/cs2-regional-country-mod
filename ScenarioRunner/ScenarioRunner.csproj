@@ -14,13 +14,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Same pinned version as the test projects. Validates inputs against Contracts/schema. -->
-    <PackageReference Include="JsonSchema.Net" Version="7.4.0" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\Contracts\Contracts.csproj" />
     <ProjectReference Include="..\RegionalEngine\RegionalEngine.csproj" />
+    <ProjectReference Include="..\RegionStore\RegionStore.csproj" />
     <ProjectReference Include="..\CitySimulator\CitySimulator.csproj" />
   </ItemGroup>
 
