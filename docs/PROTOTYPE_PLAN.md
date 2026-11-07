@@ -14,7 +14,7 @@ This covers handoff gate steps 1–4 and research gates A and B. It deliberately
 | Task | What exists | How to try it |
 |---|---|---|
 | J1 Contracts v1 | Schemas, C# DTOs, golden fixture `v1-basic`, 29 tests. Provisional until the second developer reviews it. | `dotnet test Regions.sln` |
-| A1 Solution skeleton | `Regions.sln` builds and tests from a clean clone (.NET 8.0.427). **No CI script yet** (see To do). | `dotnet build Regions.sln` |
+| A1 Solution skeleton | `Regions.sln` builds and tests from a clean clone (.NET 8.0.427). **CI:** `.github/workflows/ci.yml` runs locked restore, build and tests on Windows, Linux and macOS on every push; first green runs 2026-11-06. | `dotnet build Regions.sln` |
 | A3 Engine | Route graph, landed-cost quotes with a per-offer explanation, input hash for replay. | `regions quote Contracts/golden/v1-basic` |
 | A4 Supply rule | Provisional and missing figures are downgraded (×0.5 each) instead of excluded; `Unknown` stays excluded. | `regions quote` shows each factor |
 | A5 Simulator + invariant checker | Synthetic cities, built-in regions G01–G05, G09, G10 and `corridor`, checks for log §18.4 #1, #2, #3, #4, #5, #7, #14. | `regions scenarios`, `regions check <folder>` |
@@ -23,13 +23,13 @@ This covers handoff gate steps 1–4 and research gates A and B. It deliberately
 | A2 Region store | Inbox ingestion with duplicate, conflict and corrupt-file handling, atomic writes, crash recovery, hash-verified reads. See [RegionStore/README.md](../RegionStore/README.md). | `regions ingest <folder>` |
 | B0 (static part) | Game 1.6.2f1 matches the research baseline; mod lifecycle and load/save signals confirmed in the game code; framework, JSON and `ModsData/` confirmed on disk. See [ASSUMPTIONS.md](ASSUMPTIONS.md). | — |
 
-Tests: 629 pass (Contracts 33, Engine 387, Scenarios 167, RegionStore 42).
+Tests: 630 pass (Contracts 33, Engine 388, Scenarios 167, RegionStore 42), locally and in CI on three operating systems.
 
 ### Acceptance criteria
 | # | Criterion | Status |
 |---|---|---|
 | 1 | `dotnet test` incl. G01, G02, G03, G06, G10 | **Met** |
-| 2 | Replay byte-identical | **Met across runs and input orders.** Not yet compared across machines (macOS vs Windows), or in-game Mono vs CoreCLR (V-30). |
+| 2 | Replay byte-identical | **Met across runs, input orders and machines:** CI checks pinned golden hashes (inputs and quote file) on Windows, Linux and macOS. Not yet checked in-game (Mono vs CoreCLR, V-30). |
 | 3 | No link means `NoPath`; world fallback only with a gateway | **Met** |
 | 4 | Every quote has a trace; components sum to `landedPrice` | **Met** |
 | 5–8 | Exporter JSON, G00 safety, stable `endpointKey`s, real two-city quote | **Need the game** |
@@ -40,7 +40,7 @@ Tests: 629 pass (Contracts 33, Engine 387, Scenarios 167, RegionStore 42).
 ### To do: engine only (no game needed)
 1. ~~**A4 supply rule.**~~ Done 2026-11-06 (see the A4 row).
 2. ~~**A7 tariffs and subsidies**~~ Done 2026-11-06 (see the A7 row).
-3. **A1 leftover: CI script**, for example a GitHub Actions workflow running `dotnet build` and `dotnet test` on every push.
+3. ~~**A1 leftover: CI script.**~~ Done 2026-11-06 (GitHub Actions, three operating systems).
 4. **Open decisions to review:**
    - RegionStore: the net8.0 target, its extra rejection rules, and the exporter/inbox protocol question.
    - Contracts README "Open items": `MaxRegionSeqAge`, `saveLineageId`, and the `positionMetres` convention.
