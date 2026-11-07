@@ -19,11 +19,12 @@ This covers handoff gate steps 1–4 and research gates A and B. It deliberately
 | A4 Supply rule | Provisional and missing figures are downgraded (×0.5 each) instead of excluded; `Unknown` stays excluded. | `regions quote` shows each factor |
 | A5 Simulator + invariant checker | Synthetic cities, built-in regions G01–G05, G09, G10 and `corridor`, checks for log §18.4 #1, #2, #3, #4, #5, #7, #14. | `regions scenarios`, `regions check <folder>` |
 | A7 Tariffs and subsidies | Import tariffs (world offers only), budget-capped freight subsidies, forecast of exposure and spend. | `regions policies <folder>` |
+| Regions Sandbox (early RegionalUI / atlas M0) | Browser map: place and drag cities; draw road, rail and ship links; edit production, tariffs, subsidies and costs. Shows each city's steel price, the winning route animated, the price breakdown and the live rule check. All numbers come from the engine; tests prove it matches the engine on every scenario. See [RegionsPlayground/README.md](../RegionsPlayground/README.md). | `dotnet run --project RegionsPlayground`, open http://localhost:5280 |
 | A6 `regions` CLI | `quote`, `check`, `scenarios`, `scenario`, `ingest`. See [ScenarioRunner/README.md](../ScenarioRunner/README.md). | `dotnet run --project ScenarioRunner -- help` |
 | A2 Region store | Inbox ingestion with duplicate, conflict and corrupt-file handling, atomic writes, crash recovery, hash-verified reads. See [RegionStore/README.md](../RegionStore/README.md). | `regions ingest <folder>` |
 | B0 (static part) | Game 1.6.2f1 matches the research baseline; mod lifecycle and load/save signals confirmed in the game code; framework, JSON and `ModsData/` confirmed on disk. See [ASSUMPTIONS.md](ASSUMPTIONS.md). | — |
 
-Tests: 630 pass (Contracts 33, Engine 388, Scenarios 167, RegionStore 42), locally and in CI on three operating systems.
+Tests: 642 pass (Contracts 33, Engine 388, Scenarios 179, RegionStore 42), locally and in CI on three operating systems.
 
 ### Acceptance criteria
 | # | Criterion | Status |

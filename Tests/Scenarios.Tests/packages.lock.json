@@ -156,6 +156,14 @@
       "Regions.Contracts": {
         "type": "Project"
       },
+      "Regions.Playground": {
+        "type": "Project",
+        "dependencies": {
+          "Regions.CitySimulator": "[1.0.0, )",
+          "Regions.Contracts": "[1.0.0, )",
+          "Regions.RegionalEngine": "[1.0.0, )"
+        }
+      },
       "Regions.RegionalEngine": {
         "type": "Project",
         "dependencies": {

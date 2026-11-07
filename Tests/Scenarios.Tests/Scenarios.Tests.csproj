@@ -25,6 +25,7 @@
     <ProjectReference Include="..\..\RegionalEngine\RegionalEngine.csproj" />
     <ProjectReference Include="..\..\CitySimulator\CitySimulator.csproj" />
     <ProjectReference Include="..\..\ScenarioRunner\ScenarioRunner.csproj" />
+    <ProjectReference Include="..\..\RegionsPlayground\RegionsPlayground.csproj" />
   </ItemGroup>
 
   <ItemGroup>
