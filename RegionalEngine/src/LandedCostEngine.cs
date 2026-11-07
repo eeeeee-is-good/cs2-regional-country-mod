@@ -5,10 +5,12 @@ using Regions.Contracts;
 
 namespace Regions.Engine
 {
-    /// <summary>ARCHITECTURE.md §6. Check(state) (invariant report) arrives with A5.</summary>
+    /// <summary>ARCHITECTURE.md §6.</summary>
     public interface IRegionalEngine
     {
         QuoteResult Quote(RegionState state, QuoteRequest request);
+        /// <summary>Quotes every (city, resource) pair and checks the log §18.4 invariants. See InvariantChecker.</summary>
+        InvariantReport Check(RegionState state);
     }
 
     /// <summary>
@@ -23,6 +25,8 @@ namespace Regions.Engine
 
         private static readonly TransportMode[] AllModes =
             (TransportMode[])System.Enum.GetValues(typeof(TransportMode));
+
+        public InvariantReport Check(RegionState state) => new InvariantChecker(this).Check(state);
 
         public QuoteResult Quote(RegionState state, QuoteRequest request)
         {

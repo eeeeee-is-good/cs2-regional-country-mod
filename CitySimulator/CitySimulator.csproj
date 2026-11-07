@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Synthetic cities and regions for testing the engine without CS2 (ARCHITECTURE.md §3).
+    Pure: no game references, no IO, no clock, only explicitly seeded randomness.
+    It builds snapshots; it MUST NOT become a second economy engine.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Regions.Simulator</RootNamespace>
+    <AssemblyName>Regions.CitySimulator</AssemblyName>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Contracts\Contracts.csproj" />
+    <ProjectReference Include="..\RegionalEngine\RegionalEngine.csproj" />
+  </ItemGroup>
+
+</Project>

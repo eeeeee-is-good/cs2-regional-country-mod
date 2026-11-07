@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- L2 synthetic scenarios: CitySimulator, invariant checker and the ScenarioRunner CLI. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Regions.ScenarioTests</RootNamespace>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+
+  <!-- Same pinned versions as Contracts.Tests. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="JsonSchema.Net" Version="7.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Contracts\Contracts.csproj" />
+    <ProjectReference Include="..\..\RegionalEngine\RegionalEngine.csproj" />
+    <ProjectReference Include="..\..\CitySimulator\CitySimulator.csproj" />
+    <ProjectReference Include="..\..\ScenarioRunner\ScenarioRunner.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Contracts.Tests\TestSupport.cs" Link="Shared\TestSupport.cs" />
+  </ItemGroup>
+
+</Project>
