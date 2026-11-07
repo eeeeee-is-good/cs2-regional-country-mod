@@ -5,7 +5,7 @@ using Regions.Contracts.Tests;
 using Regions.Engine;
 using Xunit;
 using Cli = Regions.ScenarioRunner.Cli;
-using CliJson = Regions.ScenarioRunner.ContractJson;
+using CliJson = Regions.Store.ContractJson;
 using RegionFolder = Regions.ScenarioRunner.RegionFolder;
 
 namespace Regions.ScenarioTests;
@@ -103,6 +103,28 @@ public sealed class CliTests : IDisposable
         var fromDisk = new LandedCostEngine().Quote(RegionFolder.Load(dir), new QuoteRequest { DestCityId = "carford", ResourceId = "Steel" });
         var inMemory = new LandedCostEngine().Quote(Simulator.Scenarios.Build(name).ToState(), new QuoteRequest { DestCityId = "carford", ResourceId = "Steel" });
         Assert.Equal(CliJson.ToBytes(inMemory), CliJson.ToBytes(fromDisk));
+    }
+
+    [Fact]
+    public void Ingest_reports_duplicates_and_conflicts()
+    {
+        var dir = Path.Combine(_temp, "G02");
+        Assert.Equal(Cli.Ok, Run("scenario", "G02", dir).Code);
+
+        // The scenario's inbox files were already ingested: re-running is a no-op.
+        var again = Run("ingest", dir);
+        Assert.Equal(Cli.Ok, again.Code);
+        Assert.Contains("Duplicate", again.Out);
+        Assert.Contains("0 accepted", again.Out);
+
+        // A fork for ironvale: seq 2 that claims no parent.
+        var fork = Simulator.Scenarios.Ironvale().Capture();
+        fork.Seq = 2;
+        File.WriteAllBytes(Path.Combine(dir, "inbox", "ironvale.2.json"), CliJson.ToBytes(fork));
+        var conflict = Run("ingest", dir);
+        Assert.Equal(Cli.CheckFailed, conflict.Code);
+        Assert.Contains("Conflict  ironvale.2.json", conflict.Out);
+        Assert.Contains("never resolved automatically", conflict.Out);
     }
 
     [Fact]

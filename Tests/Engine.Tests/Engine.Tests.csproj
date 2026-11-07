@@ -20,10 +20,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Contracts\Contracts.csproj" />
+    <ProjectReference Include="..\..\RegionStore\RegionStore.csproj" />
     <ProjectReference Include="..\..\RegionalEngine\RegionalEngine.csproj" />
   </ItemGroup>
 
-  <!-- Engine-side JSON options and schema helpers live in Contracts.Tests until RegionStore (A2) owns them. -->
+  <!-- Shared test helpers (schema validation, repo paths); JSON options come from RegionStore. -->
   <ItemGroup>
     <Compile Include="..\Contracts.Tests\TestSupport.cs" Link="Shared\TestSupport.cs" />
   </ItemGroup>
