@@ -108,6 +108,50 @@
           "additionalProperties": false,
           "required": ["maxRegionSeqAge"],
           "properties": { "maxRegionSeqAge": { "type": ["integer", "null"], "minimum": 0 } }
+        },
+        "policies": {
+          "description": "Optional (added within v1 by A7). Federal landed-cost levers (log §17.4, §17.10). Effects on prices are modeled; budgets and exposure are forecasts, never cash.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["importTariffs", "freightSubsidies"],
+          "properties": {
+            "importTariffs": {
+              "description": "Sorted by policyId. At most one per resource. Applies to World offers only, never to domestic trade (D-44).",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["policyId", "resourceId", "adValoremPercent", "specificPerUnit"],
+                "properties": {
+                  "policyId": { "$ref": "common.v1.schema.json#/$defs/id" },
+                  "resourceId": { "$ref": "common.v1.schema.json#/$defs/id" },
+                  "adValoremPercent": { "type": "number", "minimum": 0 },
+                  "specificPerUnit": { "type": "number", "minimum": 0 }
+                }
+              }
+            },
+            "freightSubsidies": {
+              "description": "Sorted by policyId. At most one per (resource, mode). Reduces freight on qualifying domestic links only, scaled down when the forecast exposure exceeds the budget (D-43).",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["policyId", "resourceId", "mode", "linkIds", "percentOfFreight", "budgetPerGameDay"],
+                "properties": {
+                  "policyId": { "$ref": "common.v1.schema.json#/$defs/id" },
+                  "resourceId": { "$ref": "common.v1.schema.json#/$defs/id" },
+                  "mode": { "$ref": "common.v1.schema.json#/$defs/transportMode" },
+                  "linkIds": {
+                    "description": "null = every link of this mode; otherwise only these links (sorted).",
+                    "type": ["array", "null"],
+                    "items": { "$ref": "common.v1.schema.json#/$defs/id" }
+                  },
+                  "percentOfFreight": { "type": "number", "minimum": 0, "maximum": 100 },
+                  "budgetPerGameDay": { "type": "number", "minimum": 0 }
+                }
+              }
+            }
+          }
         }
       }
     }

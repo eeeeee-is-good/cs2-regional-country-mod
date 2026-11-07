@@ -8,9 +8,17 @@ namespace Regions.ScenarioRunner;
 /// <summary>Human-readable "Why this price?" output (log §18.7). Deterministic: no clock, invariant culture.</summary>
 public static class TextReport
 {
-    public static string Quote(QuoteResult q, RegionManifest manifest)
+    public static string Quote(QuoteResult q, RegionState state)
     {
+        var manifest = state.Manifest;
         var names = manifest.Cities.ToDictionary(c => c.CityId, c => string.IsNullOrEmpty(c.DisplayName) ? c.CityId : c.DisplayName);
+        string SupplyNotes(Offer o)
+        {
+            var obs = state.LatestSnapshots.FirstOrDefault(p => p.Snapshot.CityId == o.OriginCityId)?
+                .Snapshot.Resources.FirstOrDefault(r => r.ResourceId == q.ResourceId);
+            var notes = obs == null ? new List<string>() : SupplyRule.Evaluate(obs).Notes;
+            return notes.Count == 0 ? "" : " (" + string.Join(", ", notes) + ")";
+        }
         string Name(string? id) => id != null && names.TryGetValue(id, out var n) ? n : id ?? "?";
 
         var sb = new StringBuilder();
@@ -34,7 +42,8 @@ public static class TextReport
             rows.Add(new[]
             {
                 q.SelectedOfferIndex == i ? ">" : "", i.ToString(CultureInfo.InvariantCulture), origin, route,
-                N(o.ProducerPrice), N(o.Freight), N(o.Tariff), N(o.Subsidy), N(o.LandedPrice), Result(o, q.ResourceId),
+                N(o.ProducerPrice), N(o.Freight), N(o.Tariff), N(o.Subsidy), N(o.LandedPrice),
+                Result(o, q.ResourceId) + (o.OriginKind == OriginKind.City && (o.Eligible || o.ExcludedReason is ExcludedReason.NoSupply or ExcludedReason.UnknownSupply) ? SupplyNotes(o) : ""),
             });
         }
         var widths = Enumerable.Range(0, rows[0].Length).Select(c => rows.Max(r => r[c].Length)).ToArray();
@@ -67,12 +76,41 @@ public static class TextReport
     {
         var sb = new StringBuilder();
         sb.Append("Checked ").Append(report.QuotesChecked).Append(" quotes in region ").Append(manifest.RegionId)
-          .Append(" against log §18.4 invariants #1, #2, #3, #7, #14.\n");
+          .Append(" against log §18.4 invariants #1, #2, #3, #4, #5, #7, #14.\n");
         if (report.Passed) sb.Append("All invariants hold.\n");
         else
         {
             sb.Append(report.Violations.Count).Append(" violation(s):\n");
             foreach (var v in report.Violations) sb.Append("  ").Append(v).Append('\n');
+        }
+        return sb.ToString();
+    }
+
+    public static string Policies(IReadOnlyList<PolicyForecast> forecasts, RegionManifest manifest)
+    {
+        var sb = new StringBuilder();
+        sb.Append("Policies in region ").Append(manifest.RegionId).Append(" (manifest revision ").Append(manifest.Revision).Append(")\n");
+        sb.Append("  FORECAST: modeled estimates per game day, not cash. Nothing is applied to the game.\n");
+        if (forecasts.Count == 0) { sb.Append("  No policies.\n"); return sb.ToString(); }
+
+        var rows = new List<string[]> { new[] { "Policy", "Kind", "Resource", "Mode", "Exposure", "Budget", "Scale", "Spend", "Note" } };
+        foreach (var f in forecasts)
+            rows.Add(new[]
+            {
+                f.PolicyId, f.Kind, f.ResourceId, f.Mode?.ToString() ?? "-", N(f.ExposurePerGameDay), N(f.BudgetPerGameDay),
+                f.Scale is double s ? s.ToString("0.###", CultureInfo.InvariantCulture) : "-", N(f.ForecastSpendPerGameDay), f.Note,
+            });
+        var widths = Enumerable.Range(0, rows[0].Length).Select(c => rows.Max(r => r[c].Length)).ToArray();
+        var numeric = new HashSet<int> { 4, 5, 6, 7 };
+        foreach (var r in rows)
+        {
+            sb.Append("  ");
+            for (var c = 0; c < r.Length; c++)
+            {
+                var cell = c == r.Length - 1 ? r[c] : numeric.Contains(c) ? r[c].PadLeft(widths[c]) : r[c].PadRight(widths[c]);
+                sb.Append(cell).Append(c == r.Length - 1 ? "" : "  ");
+            }
+            sb.Append('\n');
         }
         return sb.ToString();
     }
@@ -86,7 +124,7 @@ public static class TextReport
             ExcludedReason.NoPath => "excluded: no usable route",
             ExcludedReason.ModeIncompatible => $"excluded: routes exist, but none in a mode allowed for {resourceId}",
             ExcludedReason.StaleSnapshot => "excluded: supplier snapshot too old",
-            ExcludedReason.UnknownSupply => "excluded: supply unknown (not validated, or data missing)",
+            ExcludedReason.UnknownSupply => "excluded: supply unknown",
             ExcludedReason.NoSupply => $"excluded: no spare supply ({N(o.EffectiveRegionalOfferPerGameDay)}/day)",
             ExcludedReason.NoWorldGateway => "excluded: gateway not usable",
             ExcludedReason.UnknownResource => "excluded: unknown resource or no price set",

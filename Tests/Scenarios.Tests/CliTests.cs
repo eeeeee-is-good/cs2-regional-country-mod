@@ -53,6 +53,14 @@ public sealed class CliTests : IDisposable
     }
 
     [Fact]
+    public void Quote_output_explains_supply_downgrades()
+    {
+        var r = Run("quote", Golden, "--dest", "city-a");
+        Assert.Equal(Cli.Ok, r.Code);
+        Assert.Contains("excluded: no spare supply (-125.00/day) (provisional x0.5, capacity unknown x0.5)", r.Out);
+    }
+
+    [Fact]
     public void Quote_output_is_identical_on_every_run()
     {
         Assert.Equal(Run("quote", Golden).Out, Run("quote", Golden).Out);
@@ -125,6 +133,21 @@ public sealed class CliTests : IDisposable
         Assert.Equal(Cli.CheckFailed, conflict.Code);
         Assert.Contains("Conflict  ironvale.2.json", conflict.Out);
         Assert.Contains("never resolved automatically", conflict.Out);
+    }
+
+    [Fact]
+    public void Policies_command_prints_a_labelled_forecast()
+    {
+        var dir = Path.Combine(_temp, "G09");
+        Assert.Equal(Cli.Ok, Run("scenario", "G09", dir).Code);
+        var r = Run("policies", dir);
+        Assert.Equal(Cli.Ok, r.Code);
+        Assert.Contains("FORECAST: modeled estimates per game day, not cash.", r.Out);
+        Assert.Contains("rail-steel", r.Out);
+        Assert.Contains("2550.00", r.Out);
+        Assert.Contains("subsidy scaled down", r.Out);
+
+        Assert.Contains("No policies.", Run("policies", Golden).Out);
     }
 
     [Fact]

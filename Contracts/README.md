@@ -74,16 +74,28 @@ Hashes are lowercase hex SHA-256 of the **exact file bytes**. Hashing happens at
 ## Quote semantics fixed by the contract (`golden/v1-basic/expected/`)
 
 - **One offer per supplier city** (every city in the manifest except the destination that has a snapshot with this resource), plus one offer per world gateway of the **destination**. In v1, world access goes only through the destination's own gateways.
-- City offer: `producerPrice = regionalProducerPriceIndex`, `freight = Σ over links (fixedCost + costPerKm × distanceKm)` along the cheapest eligible path, `landedPrice = producerPrice + freight + tariff − subsidy`. Tariff and subsidy are 0 until A7.
-- World offer: `producerPrice = worldProducerPriceIndex`, `freight = fixedCost + costPerKm × gateway.distanceKm`.
+- City offer: `producerPrice = regionalProducerPriceIndex`, `freight = Σ over links (fixedCost + costPerKm × distanceKm)` along the cheapest eligible path, `landedPrice = producerPrice + freight + tariff − subsidy`. A city offer's `tariff` is always 0: customs never applies to domestic trade (D-44).
+- World offer: `producerPrice = worldProducerPriceIndex`, `freight = fixedCost + costPerKm × gateway.distanceKm`. A world offer's `subsidy` is always 0: domestic freight support never applies to the foreign leg.
+- **Policies** (A7, engine 0.3.0, `parameters.policies`, optional within v1; a missing block means none). See `RegionalEngine/src/PolicyEvaluator.cs`.
+  - **Import tariff** (at most one per resource): `tariff = worldProducerPrice × adValoremPercent / 100 + specificPerUnit` on world offers.
+  - **Freight subsidy** (at most one per resource and mode): `percentOfFreight` of the freight on qualifying links of the path (that mode; `linkIds`, or all links of the mode when null), times a budget scale. The subsidy is never more than the freight.
+  - **Path choice** uses unsubsidised freight: a subsidy lowers the price on the physically cheapest path; it does not change which path is used.
+  - **Budget scale** (region-wide, deterministic): `exposure = Σ over supplier cities of effectiveOffer × best subsidy per unit to any destination`; `scale = exposure ≤ budget ? 1 : budget / exposure`. A zero budget stops the subsidy. Because the budget is shared, a supplier elsewhere can dilute a subsidy. This is the one intended link between otherwise separate quotes, and `regions policies` shows it.
+  - Exposure and spend are **forecasts**, never cash. Tariff revenue is not estimated, because import volumes are not tracked (D-42).
 - A link mode is usable for a resource only if it is in that resource's `allowedFreightModes`. Utility connections are never freight.
 - When an offer has several exclusion reasons, report the first in this order: `UnknownResource` → `NoPath` / `ModeIncompatible` → `StaleSnapshot` → `UnknownSupply` → `NoSupply`.
-- `effectiveRegionalOfferPerGameDay = min(output − inputUse, capacity) × confidenceFactor`, where `confidenceFactor(Validated) = 1.0`. The factors for `Provisional`/`Unknown`, and how a null capacity is handled, are **decided in A4** and documented here when merged.
+- `effectiveRegionalOfferPerGameDay = min(output − inputUse, capacity) × confidenceFactor × penalties` (decided in A4, engine 0.2.0, `RegionalEngine/src/SupplyRule.cs`). Unverified data is downgraded, not excluded (log §25.3):
+  - `confidence: Unknown`, or `output` null → `UnknownSupply` (nothing trustworthy was measured; null is never zero).
+  - `confidenceFactor`: `Validated` 1.0, `Provisional` 0.5.
+  - `inputUse` null → the surplus is unknown, so `output` replaces `output − inputUse`, with a ×0.5 penalty.
+  - `capacity` null → no capacity cap, with a ×0.5 penalty.
+  - Result ≤ 0 → `NoSupply`. `UnknownSupply` takes precedence over `NoSupply`.
+  - In v1 this quantity only decides eligibility and is reported; it never changes a price. So there is no age decay: staleness is the `maxRegionSeqAge` cut-off.
 - `selectedOfferIndex` points to the lowest eligible `landedPrice`; a tie goes to the earlier offer. It is `null` when nothing is eligible.
 - Offer order: City offers by `originCityId`, then World offers by gateway `endpointKey`.
 
 ## Open items to settle in review
 
-- Whether `MaxRegionSeqAge` (staleness counted in ingestions, not in city clocks) is the right rule. Developer A may replace it in A4.
+- ~~Whether `MaxRegionSeqAge` is the right rule.~~ **Kept in A4 (2026-11-06):** it is the only staleness signal that never compares independent city clocks. Revisit if quantities start to affect prices (then add age decay to the effective offer).
 - Whether `CitySnapshot` needs `saveLineageId` before V-15 is verified. Currently it doesn't; lineage is checked through `seq`/`parentSeq`/`gameDays`.
 - The coordinate convention of `positionMetres` (V-28). Golden values assume map-centred x/z with y up, and that is a guess.

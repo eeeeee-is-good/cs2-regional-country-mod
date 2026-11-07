@@ -24,6 +24,7 @@ public static class Cli
             --json <outFolder>                    Also write quote.<dest>.<resource>.json files.
           regions check <folder>                Quote everything and check the log §18.4 invariants.
           regions ingest <folder>               Accept new snapshot files from <folder>/inbox and report conflicts.
+          regions policies <folder>             Forecast of every tariff and subsidy: exposure, budget, scale.
 
           --resources <file>                    Resource table to use (default: the bundled resource-ids.v1.json).
 
@@ -66,7 +67,7 @@ public static class Cli
                     for (var i = 0; i < quotes.Count; i++)
                     {
                         if (i > 0) stdout.Write("\n");
-                        stdout.Write(TextReport.Quote(quotes[i], state.Manifest));
+                        stdout.Write(TextReport.Quote(quotes[i], state));
                         if (options.TryGetValue("json", out var outDir)) RegionFolder.WriteQuote(quotes[i], outDir);
                     }
                     return Ok;
@@ -79,6 +80,14 @@ public static class Cli
                     var report = new LandedCostEngine().Check(state);
                     stdout.Write(TextReport.Check(report, state.Manifest));
                     return report.Passed ? Ok : CheckFailed;
+                }
+
+                case "policies":
+                {
+                    Require(positional, 2, "regions policies <folder>");
+                    var state = RegionFolder.Load(positional[1], options.GetValueOrDefault("resources"));
+                    stdout.Write(TextReport.Policies(new LandedCostEngine().Forecast(state), state.Manifest));
+                    return Ok;
                 }
 
                 case "ingest":

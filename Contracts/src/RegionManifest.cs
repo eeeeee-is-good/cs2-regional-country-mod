@@ -80,6 +80,44 @@ namespace Regions.Contracts
         /// <summary>Sorted by ResourceId.</summary>
         public List<ResourcePrice> ResourcePrices { get; set; } = new List<ResourcePrice>();
         public StalenessRule Staleness { get; set; } = new StalenessRule();
+        /// <summary>Optional in the schema (added within v1 by A7). Writers always write it; a reader treats a missing
+        /// value as no policies.</summary>
+        public PolicySet Policies { get; set; } = new PolicySet();
+    }
+
+    /// <summary>Federal landed-cost levers (log §17.4, §17.10). Price effects are modeled; budgets are forecasts, not cash.</summary>
+    public sealed class PolicySet
+    {
+        /// <summary>Sorted by PolicyId. At most one per resource.</summary>
+        public List<ImportTariff> ImportTariffs { get; set; } = new List<ImportTariff>();
+        /// <summary>Sorted by PolicyId. At most one per (ResourceId, Mode).</summary>
+        public List<FreightSubsidy> FreightSubsidies { get; set; } = new List<FreightSubsidy>();
+    }
+
+    /// <summary>Customs duty on World offers of one resource: worldProducerPrice x adValoremPercent/100 + specificPerUnit.
+    /// Never applied to domestic (City) offers (D-44).</summary>
+    public sealed class ImportTariff
+    {
+        public string PolicyId { get; set; } = "";
+        public string ResourceId { get; set; } = "";
+        public double AdValoremPercent { get; set; }
+        public double SpecificPerUnit { get; set; }
+    }
+
+    /// <summary>
+    /// Pays PercentOfFreight of the freight on qualifying domestic links (this mode; LinkIds or all links) for one resource.
+    /// The forecast exposure is capped by BudgetPerGameDay: when it is exceeded, the subsidy is scaled down for everyone
+    /// (D-43, log §17.7). A forecast, never a cash transfer.
+    /// </summary>
+    public sealed class FreightSubsidy
+    {
+        public string PolicyId { get; set; } = "";
+        public string ResourceId { get; set; } = "";
+        public TransportMode Mode { get; set; }
+        /// <summary>null = every link of Mode; otherwise only these links (sorted).</summary>
+        public List<string>? LinkIds { get; set; }
+        public double PercentOfFreight { get; set; }
+        public double BudgetPerGameDay { get; set; }
     }
 
     public sealed class ModeCost

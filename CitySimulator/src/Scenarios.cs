@@ -28,9 +28,14 @@ namespace Regions.Simulator
             new Entry("G01", "Two cities, no link: the producer has no influence; Carford falls back to the world market (140).", G01),
             new Entry("G02", "Two cities, 50 km road: Ironvale steel lands at 107 and beats the world (140).", G02),
             new Entry("G03", "Road vs rail over 400 km: road 142, rail 134, world 140. Rail wins.", G03),
+            new Entry("G04", "Import tariff of 10% on steel: world steel rises from 140 to 152.80, so Ironvale's 400 km road offer (142) wins. Domestic offers pay no customs.", G04),
+            new Entry("G05", "Rail freight subsidy of 25% on steel: Ironvale by rail drops from 134 to 125.50. Road and world prices do not move.", G05),
+            new Entry("G09", "The G05 subsidy with half the budget it needs: it is scaled to 50%, so rail lands at 129.75 and the forecast spend equals the budget.", G09),
             new Entry("G10", "Edge cases: zero and huge distances, a mode with no cost, one-way links and a cycle. No NaN, no infinite loop.", G10),
             new Entry("corridor", "Steel from Ironvale reaches Carford through the transit city Midway (rail then road). Lonepeak is cut off.", Corridor),
         };
+
+        private static string Desc(string name) => All.First(e => e.Name == name).Description;
 
         public static RegionScenario Build(string name) =>
             (All.FirstOrDefault(e => string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase))
@@ -59,18 +64,34 @@ namespace Regions.Simulator
             return s.Publish(Ironvale(), Carford());
         }
 
-        private static RegionScenario G01() => TwoCities("G01", All[0].Description);
+        private static RegionScenario G01() => TwoCities("G01", Desc("G01"));
 
-        private static RegionScenario G02() => TwoCities("G02", All[1].Description)
+        private static RegionScenario G02() => TwoCities("G02", Desc("G02"))
             .Link("ic-road-01", "ironvale", "oc-road-east-01", "carford", "oc-road-west-01", TransportMode.Road, 50);
 
-        private static RegionScenario G03() => TwoCities("G03", All[2].Description)
+        private static RegionScenario G03() => TwoCities("G03", Desc("G03"))
+            .Link("ic-rail-01", "ironvale", "oc-rail-east-01", "carford", "oc-rail-west-01", TransportMode.Rail, 400)
+            .Link("ic-road-01", "ironvale", "oc-road-east-01", "carford", "oc-road-west-01", TransportMode.Road, 400);
+
+        private static RegionScenario G04() => TwoCities("G04", Desc("G04"))
+            .Link("ic-road-01", "ironvale", "oc-road-east-01", "carford", "oc-road-west-01", TransportMode.Road, 400)
+            .ImportTariff("tariff-steel", "Steel", adValoremPercent: 10);
+
+        // Exposure: Ironvale offers 300/day; its best subsidised route (rail to Carford) saves 25% of 34 = 8.5 per unit.
+        // 300 x 8.5 = 2550/day. G05's budget covers it; G09's budget is half of it.
+        private static RegionScenario G05() => G03Named("G05", Desc("G05"))
+            .FreightSubsidy("rail-steel", "Steel", TransportMode.Rail, percentOfFreight: 25, budgetPerGameDay: 10000);
+
+        private static RegionScenario G09() => G03Named("G09", Desc("G09"))
+            .FreightSubsidy("rail-steel", "Steel", TransportMode.Rail, percentOfFreight: 25, budgetPerGameDay: 1275);
+
+        private static RegionScenario G03Named(string name, string description) => TwoCities(name, description)
             .Link("ic-rail-01", "ironvale", "oc-rail-east-01", "carford", "oc-rail-west-01", TransportMode.Rail, 400)
             .Link("ic-road-01", "ironvale", "oc-road-east-01", "carford", "oc-road-west-01", TransportMode.Road, 400);
 
         private static RegionScenario G10()
         {
-            var s = new RegionScenario("G10", All[3].Description)
+            var s = new RegionScenario("G10", Desc("G10"))
                 .City("carford", "Carford (consumer)")
                 .City("ironvale", "Ironvale (producer)")
                 .City("loopton", "Loopton (cycle)")
@@ -96,7 +117,7 @@ namespace Regions.Simulator
 
         private static RegionScenario Corridor()
         {
-            var s = new RegionScenario("corridor", All[4].Description)
+            var s = new RegionScenario("corridor", Desc("corridor"))
                 .City("carford", "Carford (consumer)")
                 .City("ironvale", "Ironvale (producer)")
                 .City("lonepeak", "Lonepeak (isolated)")
