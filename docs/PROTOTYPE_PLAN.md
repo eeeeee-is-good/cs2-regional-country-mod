@@ -19,6 +19,8 @@ This covers handoff gate steps 1–4 and research gates A and B. It deliberately
 
 ## Task split
 
+> **Staffing (2026-11-06):** one developer currently does both tracks; a second developer is expected to join later (see CLAUDE.md "Current staffing"). The A/B split stays as the plan for when they do. "Awaiting review by both developers" below means awaiting self-review now, and review by the second developer once they join.
+
 ### Joint, first (½–1 day, blocking): **J1 Contracts v1**: drafted 2026-11-04 in `Contracts/`; builds, 29 contract tests pass (.NET 8.0.427, macOS arm64); awaiting review by both developers
 Agree on and merge `Contracts/`: DTOs, JSON schema, the resource-id table, and golden files covering 2 cities, 1 road link, 1 rail link, 1 world gateway and 1 resource. Field shapes are in ARCHITECTURE.md §5. **After merge, either developer changes Contracts only through a PR the other reviews.**
 Dev B runs the V-02/V-03 spikes first, because they decide whether the mod can reference `Contracts.dll` directly. The fallback is to compile the Contracts sources into the mod and write the JSON by hand there.
