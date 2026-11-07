@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Pure deterministic regional engine (ARCHITECTURE.md §3). MUST stay free of game, Unity, Harmony and
+    serializer dependencies, IO, clock reads and unseeded randomness.
+    netstandard2.0 so the CS2 mod can call it in-process later (V-02, unverified).
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Regions.Engine</RootNamespace>
+    <AssemblyName>Regions.RegionalEngine</AssemblyName>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Contracts\Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

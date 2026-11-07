@@ -28,7 +28,7 @@ Dev B runs the V-02/V-03 spikes first, because they decide whether the mod can r
 |---|---|---|
 | A1 | Solution skeleton (`netstandard2.0` libs, `net8` tests/CLI), CI script, golden round-trip tests | `dotnet build && dotnet test` green from a clean clone |
 | A2 | `RegionStore`: inbox ingestion per Contracts/README.md, atomic writes, index, conflict reporting; moves the engine-side JSON options out of the tests | Unit tests for duplicate, older, conflicting and corrupt-file cases |
-| A3 | Route graph + landed-cost solver (road, rail, world fallback), mode compatibility, trace | G01, G02, G03, G10 pass |
+| A3 | Route graph + landed-cost solver (road, rail, world fallback), mode compatibility, trace | G01, G02, G03, G10 pass. **Drafted 2026-11-06** on `feature/a3-regional-engine`: `RegionalEngine/` reproduces the v1-basic golden quote; G01–G03, G10, replay and 300 seeded random-graph property tests (brute-force path check) pass (.NET 8.0.427, Windows x64). Uses an interim fail-closed supply rule (non-Validated or null input = `UnknownSupply`) until A4. Awaiting review. |
 | A4 | Supply eligibility: `min(surplus, capacity) × confidence`, staleness exclusion, null = unknown | Tests show stale, null and zero cases behave as specified |
 | A5 | `CitySimulator` + scenario fixtures + invariant checker (§18.4 #1, 2, 3, 7, 8, 14) + replay test | G06 and replay pass; property tests on random graphs |
 | A6 | `ScenarioRunner` CLI: fixture folder in, quotes and traces out (JSON + readable text) | Runs against the golden fixtures |
