@@ -17,6 +17,11 @@ public class PlaygroundTests
     public void Sandbox_gives_the_same_prices_as_the_engine_for_every_scenario(string name)
     {
         var scenario = Simulator.Scenarios.Build(name);
+        // The sandbox opens examples with its default scarcity rule on; compare against the engine with the same rule.
+        scenario.Manifest.Parameters.Scarcity ??= new ScarcityRule
+        {
+            PremiumSlope = Playground.Playground.DefaultScarcitySlope, MaxPremium = Playground.Playground.DefaultScarcityCap,
+        };
         var direct = scenario.ToState();
         var model = Playground.Playground.FromScenario(Simulator.Scenarios.Build(name));
         var analysis = Playground.Playground.Analyze(model);
@@ -34,7 +39,24 @@ public class PlaygroundTests
     }
 
     private static string Prices(QuoteResult q) =>
-        string.Join("|", q.Offers.Select(o => $"{o.OriginKind}:{o.OriginCityId}:{o.Eligible}:{o.ExcludedReason}:{o.LandedPrice:R}:{o.Tariff:R}:{o.Subsidy:R}:{o.Path.Count}"));
+        string.Join("|", q.Offers.Select(o => $"{o.OriginKind}:{o.OriginCityId}:{o.Eligible}:{o.ExcludedReason}:{o.LandedPrice:R}:{o.ScarcityPremium:R}:{o.Tariff:R}:{o.Subsidy:R}:{o.Path.Count}"));
+
+    [Fact]
+    public void Markets_are_reported_and_json_safe()
+    {
+        var model = Playground.Playground.FromScenario(Simulator.Scenarios.Build("G03"));
+        var a = Playground.Playground.Analyze(model);
+        var ironvale = Assert.Single(a.Markets);
+        Assert.Equal("ironvale", ironvale.CityId);
+        Assert.Equal(300, ironvale.SpareSupply);
+        Assert.Equal(500, a.Cities["carford"].Demand);
+        // Serializable with web defaults (an infinite switch price would throw).
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
+        Assert.Contains("\"markets\"", JsonSerializer.Serialize(a, options));
+
+        model.ScarcityEnabled = false;
+        Assert.Empty(Playground.Playground.Analyze(model).Markets);
+    }
 
     [Fact]
     public void Empty_map_is_valid()

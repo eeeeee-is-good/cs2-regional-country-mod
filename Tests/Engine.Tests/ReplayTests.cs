@@ -29,8 +29,8 @@ public class ReplayTests
         Assert.True(PinnedGoldenQuoteSha256 == quoteSha, $"quote file sha256 is {quoteSha}");
     }
 
-    private const string PinnedGoldenInputsSha256 = "b66d28317f3fb29cd02c26480ff9734cbb8540c93892a349686747d67f157f14";
-    private const string PinnedGoldenQuoteSha256 = "e4e53d55cba6d10d11348707547a1c324a87f150b7e2a32f0168cb1ecb2a7996";
+    private const string PinnedGoldenInputsSha256 = "75fa2a07ecf5525ae2176616f8257765a23a0f77cac3cc0f5c412ead9f952612";
+    private const string PinnedGoldenQuoteSha256 = "e2a35c1f9a6eae64565135acfb6f1e07f2364c7c10c9669c7fcd07ccb8aa48c2";
 
     [Fact]
     public void Input_order_does_not_change_a_single_byte()

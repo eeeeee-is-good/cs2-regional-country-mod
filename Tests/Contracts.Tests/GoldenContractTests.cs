@@ -142,7 +142,7 @@ public class GoldenContractTests
         Assert.False(q.AppliedToGame);
 
         foreach (var o in q.Offers.Where(o => o.Eligible))
-            Assert.Equal(o.LandedPrice!.Value, o.ProducerPrice!.Value + o.Freight!.Value + o.Tariff!.Value - o.Subsidy!.Value, 9);
+            Assert.Equal(o.LandedPrice!.Value, o.ProducerPrice!.Value + (o.ScarcityPremium ?? 0) + o.Freight!.Value + o.Tariff!.Value - o.Subsidy!.Value, 9);
 
         // Freight recomputed from manifest parameters for city offers.
         var cost = m.Parameters.ModeCosts.ToDictionary(c => c.Mode);

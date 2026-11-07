@@ -82,6 +82,22 @@ Hashes are lowercase hex SHA-256 of the **exact file bytes**. Hashing happens at
   - **Path choice** uses unsubsidised freight: a subsidy lowers the price on the physically cheapest path; it does not change which path is used.
   - **Budget scale** (region-wide, deterministic): `exposure = Σ over supplier cities of effectiveOffer × best subsidy per unit to any destination`; `scale = exposure ≤ budget ? 1 : budget / exposure`. A zero budget stops the subsidy. Because the budget is shared, a supplier elsewhere can dilute a subsidy. This is the one intended link between otherwise separate quotes, and `regions policies` shows it.
   - Exposure and spend are **forecasts**, never cash. Tariff revenue is not estimated, because import volumes are not tracked (D-42).
+- **Scarcity pricing** (engine 0.4.0, `parameters.scarcity`, optional within v1; null or absent means off, so suppliers sell any quantity at their base price). See `RegionalEngine/src/ScarcityEvaluator.cs`.
+  - Every eligible supplier is a small supply/demand market at its gate (log §16.3 caveat, §17.4 step 4).
+  - **Supply curve:** flat at `regionalProducerPriceIndex` up to the supplier's effective offer (A4). Beyond it, the price is `base × (1 + min(maxPremium, premiumSlope × (q / offer − 1)))`.
+  - **Demand:** each city with a deficit (`inputUse − output > 0`, both measured, confidence not `Unknown`) that the supplier can reach leans on it while its delivered price is no worse than the city's next-best option (another supplier at its current price, or the world). So demand is a falling step curve.
+  - **Cleared price:** the lowest gate price where supply covers that demand. The world price acts as a ceiling: an overloaded supplier is priced up to the point where its marginal buyer would rather import.
+  - **Competing suppliers** are re-cleared with each other's latest prices until nothing changes. This starts from zero premiums and only rises, so it converges deterministically to the smallest consistent prices.
+  - **Simplification:** a city's demand leans on one supplier at a time; it is not split.
+  - **On the offer:** `scarcityPremium` = cleared gate price − base. It is 0 when there is no pressure or no rule, 0 on world offers, and null when the offer is ineligible. `landedPrice = producerPrice + scarcityPremium + freight + tariff − subsidy`.
+  - **What tests prove** (Tests/Scenarios.Tests/ScarcityPropertyTests.cs, 150 random regions):
+    - More supply never raises a price, and more demand never lowers one (without subsidies).
+    - With budget-capped subsidies, a fixed budget spread over more volume can legitimately raise a price, but the price before subsidies still follows supply.
+    - Premiums stay within the cap.
+  - **Effects to expect**, which the checker allows:
+    - A higher import tariff can raise a scarce domestic producer's price (it lifts the ceiling): protection raises domestic prices.
+    - Extra supply in a city that can't reach you can still lower your price, by relieving a supplier you share with cities it can reach.
+  - A price signal only: nothing is shipped, allocated or booked.
 - A link mode is usable for a resource only if it is in that resource's `allowedFreightModes`. Utility connections are never freight.
 - When an offer has several exclusion reasons, report the first in this order: `UnknownResource` → `NoPath` / `ModeIncompatible` → `StaleSnapshot` → `UnknownSupply` → `NoSupply`.
 - `effectiveRegionalOfferPerGameDay = min(output − inputUse, capacity) × confidenceFactor × penalties` (decided in A4, engine 0.2.0, `RegionalEngine/src/SupplyRule.cs`). Unverified data is downgraded, not excluded (log §25.3):

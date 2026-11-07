@@ -88,6 +88,10 @@ namespace Regions.Engine
 
             w.Int(m.Parameters.Staleness.MaxRegionSeqAge);
 
+            var scarcity = m.Parameters.Scarcity;
+            w.Bool(scarcity != null);
+            if (scarcity != null) { w.Num(scarcity.PremiumSlope); w.Num(scarcity.MaxPremium); }
+
             // A missing optional policies block means no policies, so it hashes like an empty one.
             var policies = m.Parameters.Policies ?? new PolicySet();
             var tariffs = policies.ImportTariffs.OrderBy(t => t.PolicyId, StringComparer.Ordinal).ToList();

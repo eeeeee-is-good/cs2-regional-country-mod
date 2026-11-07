@@ -26,6 +26,12 @@ Then open <http://localhost:5280> in your browser. Stop it with Ctrl+C in the te
 - **Links you draw** follow the map distance as you drag cities. Type a distance to fix it instead.
 - **Policies:** import tariff and per-mode freight subsidies with daily budgets. The forecast table shows when a budget is too small and the subsidy is scaled down.
 - **Prices and transport costs:** the steel producer and world prices, and each mode's fixed and per-km cost.
+- **Supply and demand** (on by default, in "Prices and transport costs"):
+  - A producer sells its spare steel at the normal price. When the cities leaning on it need more, its price climbs (default +25% of the price per 100% overload, at most +100%), until buyers would rather import or buy elsewhere.
+  - An overloaded producer's map tag shows "sells at …".
+  - Selecting a producer shows **its supply and demand chart**: the supply curve, each buyer's demand step at the price where it would switch, and the price where they meet. A table lists who buys, who is on the edge and who goes elsewhere.
+  - Selecting a consumer shows how much steel it needs. The orange part of a price bar is the scarcity premium.
+  - **Try this:** load G03. Ironvale has 300 spare and Carford needs 500, so Ironvale's price rises to the world ceiling (Carford pays 140). Raise Ironvale's output to 1150 and the price drops to 136.78. Lower Carford's use to 300 and it falls to 134.
 - **Load an example** opens the built-in scenarios (G01–G10, corridor). Your current map is kept in the browser between visits. **Export** and **Import** save it to a file.
 - **The badge at the top right** is the invariant checker (log §18.4). Click it for details.
 
@@ -33,4 +39,4 @@ Then open <http://localhost:5280> in your browser. Stop it with Ctrl+C in the te
 
 `Playground.cs` turns the map into a real `RegionState`: one synthetic city per map city, one transport gate per mode it uses, and one snapshot each. It then calls `LandedCostEngine.Quote`, `Check` and `Forecast`. The server keeps no state: the page posts the whole map and gets the analysis back. `Tests/Scenarios.Tests/PlaygroundTests.cs` checks that the sandbox gives exactly the engine's prices for every built-in scenario.
 
-This version models one resource (Steel). Supply follows the A4 rule: provisional or missing figures are downgraded, and unknown confidence is excluded.
+This version models one resource (Steel). Supply follows the A4 rule: provisional or missing figures are downgraded, and unknown confidence is excluded. Scarcity pricing follows the rule in Contracts/README.md "Scarcity pricing".
