@@ -36,6 +36,8 @@ namespace Regions.Engine
     ///   #1 graph isolation (counterfactual: boosting an unreachable supplier changes nothing),
     ///   #2 path correctness (contiguous, directional, usable, mode-compatible, freight = sum of links),
     ///   #3 best feasible offer (removing any link never makes an offer cheaper or newly eligible),
+    ///   #4 tariff specificity (customs only on world offers; raising a tariff never touches domestic offers),
+    ///   #5 subsidy specificity (subsidies only on subsidised domestic offers, never above freight),
     ///   #7 numerical safety (finite, non-negative, components sum to landedPrice),
     ///   #14 evidence labeling (modeled quote, not applied to the game).
     /// #8 (idempotent snapshots) is a region-store property and is tested with RegionStore (A2).
@@ -45,6 +47,8 @@ namespace Regions.Engine
         public const string GraphIsolation = "18.4#1";
         public const string PathCorrectness = "18.4#2";
         public const string BestFeasibleOffer = "18.4#3";
+        public const string TariffSpecificity = "18.4#4";
+        public const string SubsidySpecificity = "18.4#5";
         public const string NumericSafety = "18.4#7";
         public const string EvidenceLabeling = "18.4#14";
         public const string Selection = "selection";
@@ -84,6 +88,8 @@ namespace Regions.Engine
                 CheckPaths(state, q, Fail);
                 CheckIsolation(state, request, q, report, Fail);
                 CheckLinkRemoval(state, request, q, report, Fail);
+                CheckTariffScope(state, request, q, report, Fail);
+                CheckSubsidyScope(state, request, q, report, Fail);
             }
             return report;
         }
@@ -125,6 +131,9 @@ namespace Regions.Engine
                 }
                 var sum = o.ProducerPrice!.Value + o.Freight!.Value + o.Tariff!.Value - o.Subsidy!.Value;
                 if (!Close(sum, o.LandedPrice!.Value)) fail(NumericSafety, $"offer {i}: components sum to {F(sum)}, landedPrice is {F(o.LandedPrice.Value)}");
+                if (o.Subsidy!.Value > o.Freight!.Value + Tolerance(o.Freight.Value)) fail(SubsidySpecificity, $"offer {i}: subsidy {F(o.Subsidy)} exceeds freight {F(o.Freight)}");
+                if (o.OriginKind == OriginKind.City && o.Tariff!.Value != 0) fail(TariffSpecificity, $"offer {i}: customs tariff {F(o.Tariff)} on a domestic offer");
+                if (o.OriginKind == OriginKind.World && o.Subsidy!.Value != 0) fail(SubsidySpecificity, $"offer {i}: domestic freight subsidy {F(o.Subsidy)} on a world offer");
             }
         }
 
@@ -170,7 +179,12 @@ namespace Regions.Engine
             }
         }
 
-        /// <summary>#1: an unreachable supplier with 10x more steel must not change anything.</summary>
+        /// <summary>
+        /// #1: an unreachable supplier with 10x more steel must not change the market layer (eligibility, path, producer
+        /// price, freight, customs) and must not make any offer cheaper. Budget-capped subsidies are shared region-wide
+        /// (PolicyEvaluator), so a bigger supplier elsewhere may legitimately dilute a subsidy and raise a price: that is
+        /// budget competition, not a phantom benefit.
+        /// </summary>
         private void CheckIsolation(RegionState state, QuoteRequest request, QuoteResult q, InvariantReport report, Action<string, string> fail)
         {
             foreach (var o in q.Offers.Where(o => o.OriginKind == OriginKind.City
@@ -178,12 +192,21 @@ namespace Regions.Engine
             {
                 var boosted = WithBoostedSupplier(state, o.OriginCityId!, request.ResourceId);
                 var q2 = TryQuote(boosted, request, report);
-                if (q2 != null && Decision(q2) != Decision(q))
+                if (q2 == null) continue;
+                if (MarketLayer(q2) != MarketLayer(q))
                     fail(GraphIsolation, $"boosting unreachable supplier {o.OriginCityId} changed the quote");
+                for (var i = 0; i < Math.Min(q.Offers.Count, q2.Offers.Count); i++)
+                    if (q.Offers[i].Eligible && q2.Offers[i].Eligible
+                        && q2.Offers[i].LandedPrice < q.Offers[i].LandedPrice - Tolerance(q.Offers[i].LandedPrice!.Value))
+                        fail(GraphIsolation, $"boosting unreachable supplier {o.OriginCityId} made offer {i} cheaper");
             }
         }
 
-        /// <summary>#3, checked in reverse: removing any link never makes an offer cheaper or newly eligible.</summary>
+        /// <summary>
+        /// #3, checked in reverse: removing any link never makes an offer newly eligible or cheaper before buyer support
+        /// (landed + subsidy). Log §18.4 #3 holds "when all capacities/policies are held fixed"; a shared subsidy budget
+        /// is a capacity-like constraint whose re-scaling is checked by #5, not here.
+        /// </summary>
         private void CheckLinkRemoval(RegionState state, QuoteRequest request, QuoteResult q, InvariantReport report, Action<string, string> fail)
         {
             foreach (var link in state.Manifest.Links.OrderBy(l => l.LinkId, StringComparer.Ordinal))
@@ -197,10 +220,74 @@ namespace Regions.Engine
                     var after = q2.Offers[i];
                     if (after.Eligible && !before.Eligible)
                         fail(BestFeasibleOffer, $"removing link {link.LinkId} made offer {i} eligible");
-                    else if (after.Eligible && before.Eligible && after.LandedPrice < before.LandedPrice - Tolerance(before.LandedPrice!.Value))
-                        fail(BestFeasibleOffer, $"removing link {link.LinkId} made offer {i} cheaper ({F(before.LandedPrice)} -> {F(after.LandedPrice)})");
+                    else if (after.Eligible && before.Eligible && PreSupport(after) < PreSupport(before) - Tolerance(PreSupport(before)))
+                        fail(BestFeasibleOffer, $"removing link {link.LinkId} made offer {i} cheaper ({F(PreSupport(before))} -> {F(PreSupport(after))} before subsidies)");
                 }
             }
+        }
+
+        /// <summary>#4: raising this resource's import tariffs leaves every domestic offer unchanged and makes no world offer cheaper.</summary>
+        private void CheckTariffScope(RegionState state, QuoteRequest request, QuoteResult q, InvariantReport report, Action<string, string> fail)
+        {
+            var policies = state.Manifest.Parameters.Policies;
+            if (policies == null || !policies.ImportTariffs.Any(t => t.ResourceId == request.ResourceId)) return;
+            var raised = new PolicySet
+            {
+                FreightSubsidies = policies.FreightSubsidies,
+                ImportTariffs = policies.ImportTariffs.Select(t => t.ResourceId != request.ResourceId ? t : new ImportTariff
+                {
+                    PolicyId = t.PolicyId, ResourceId = t.ResourceId,
+                    AdValoremPercent = t.AdValoremPercent * 2 + 10, SpecificPerUnit = t.SpecificPerUnit * 2 + 1,
+                }).ToList(),
+            };
+            var q2 = TryQuote(WithPolicies(state, raised), request, report);
+            if (q2 == null || q2.Offers.Count != q.Offers.Count) return;
+            for (var i = 0; i < q.Offers.Count; i++)
+            {
+                var before = q.Offers[i];
+                var after = q2.Offers[i];
+                if (before.OriginKind == OriginKind.City && OfferKey(before) != OfferKey(after))
+                    fail(TariffSpecificity, $"raising an import tariff changed domestic offer {i}");
+                if (before.OriginKind == OriginKind.World && before.Eligible && after.Eligible && after.LandedPrice < before.LandedPrice - Tolerance(before.LandedPrice!.Value))
+                    fail(TariffSpecificity, $"raising an import tariff made world offer {i} cheaper");
+            }
+        }
+
+        /// <summary>#5: removing this resource's freight subsidies changes only city offers that received a subsidy, and never lowers a price.</summary>
+        private void CheckSubsidyScope(RegionState state, QuoteRequest request, QuoteResult q, InvariantReport report, Action<string, string> fail)
+        {
+            var policies = state.Manifest.Parameters.Policies;
+            if (policies == null || !policies.FreightSubsidies.Any(s => s.ResourceId == request.ResourceId)) return;
+            var removed = new PolicySet
+            {
+                ImportTariffs = policies.ImportTariffs,
+                FreightSubsidies = policies.FreightSubsidies.Where(s => s.ResourceId != request.ResourceId).ToList(),
+            };
+            var q2 = TryQuote(WithPolicies(state, removed), request, report);
+            if (q2 == null || q2.Offers.Count != q.Offers.Count) return;
+            for (var i = 0; i < q.Offers.Count; i++)
+            {
+                var before = q.Offers[i];
+                var after = q2.Offers[i];
+                var subsidised = before.Eligible && before.Subsidy > 0;
+                if (!subsidised && OfferKey(before) != OfferKey(after))
+                    fail(SubsidySpecificity, $"removing a freight subsidy changed offer {i}, which received no subsidy");
+                if (subsidised && after.Eligible && after.LandedPrice < before.LandedPrice - Tolerance(before.LandedPrice!.Value))
+                    fail(SubsidySpecificity, $"removing a freight subsidy made offer {i} cheaper");
+            }
+        }
+
+        private static RegionState WithPolicies(RegionState s, PolicySet policies)
+        {
+            var m = s.Manifest;
+            var p = m.Parameters;
+            var copy = new RegionManifest
+            {
+                SchemaVersion = m.SchemaVersion, RegionId = m.RegionId, Revision = m.Revision,
+                Cities = m.Cities, Links = m.Links, WorldGateways = m.WorldGateways,
+                Parameters = new ModelParameters { ModeCosts = p.ModeCosts, ResourcePrices = p.ResourcePrices, Staleness = p.Staleness, Policies = policies },
+            };
+            return new RegionState(copy, s.LatestSnapshots, s.CurrentRegionSeq, s.Resources);
         }
 
         private static RegionState WithoutLink(RegionState s, string linkId)
@@ -245,10 +332,19 @@ namespace Regions.Engine
 
         /// <summary>Offers and selection, excluding the supplier snapshot's own figures (they change in the counterfactual).</summary>
         private static string Decision(QuoteResult q) =>
-            string.Join("|", q.Offers.Select(o => string.Join(",",
-                o.OriginKind, o.OriginCityId, o.WorldGatewayEndpointKey, string.Join(">", o.Path), o.Eligible, o.ExcludedReason,
-                F(o.ProducerPrice), F(o.Freight), F(o.Tariff), F(o.Subsidy), F(o.LandedPrice))))
-            + "|selected=" + q.SelectedOfferIndex;
+            string.Join("|", q.Offers.Select(OfferKey)) + "|selected=" + q.SelectedOfferIndex;
+
+        /// <summary>Landed price before buyer/logistics support (log §17.4 step 5).</summary>
+        private static double PreSupport(Offer o) => o.LandedPrice!.Value + (o.Subsidy ?? 0);
+
+        /// <summary>The market layer only: everything except the budget-dependent subsidy and the selection it can move.</summary>
+        private static string MarketLayer(QuoteResult q) => string.Join("|", q.Offers.Select(o => string.Join(",",
+            o.OriginKind, o.OriginCityId, o.WorldGatewayEndpointKey, string.Join(">", o.Path), o.Eligible, o.ExcludedReason,
+            F(o.ProducerPrice), F(o.Freight), F(o.Tariff), F(o.Eligible ? PreSupport(o) : (double?)null))));
+
+        private static string OfferKey(Offer o) => string.Join(",",
+            o.OriginKind, o.OriginCityId, o.WorldGatewayEndpointKey, string.Join(">", o.Path), o.Eligible, o.ExcludedReason,
+            F(o.ProducerPrice), F(o.Freight), F(o.Tariff), F(o.Subsidy), F(o.LandedPrice));
 
         private static bool Close(double a, double b) => Math.Abs(a - b) <= Tolerance(Math.Max(Math.Abs(a), Math.Abs(b)));
         private static double Tolerance(double magnitude) => 1e-9 * Math.Max(1, Math.Abs(magnitude));

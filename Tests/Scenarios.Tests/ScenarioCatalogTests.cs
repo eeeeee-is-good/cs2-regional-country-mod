@@ -60,6 +60,25 @@ public class ScenarioCatalogTests
     }
 
     [Fact]
+    public void G04_tariff_flips_the_winner_to_domestic_steel()
+    {
+        var q = Quote(Scenarios.Build("G04"));
+        Assert.Equal(152.8, World(q).LandedPrice!.Value, 9);
+        Assert.Equal(0, From(q, "ironvale").Tariff);
+        Assert.Same(From(q, "ironvale"), q.Offers[q.SelectedOfferIndex!.Value]);
+    }
+
+    [Fact]
+    public void G05_and_G09_subsidy_within_and_beyond_budget()
+    {
+        Assert.Equal(125.5, From(Quote(Scenarios.Build("G05")), "ironvale").LandedPrice!.Value, 9);
+        var g09 = Scenarios.Build("G09");
+        Assert.Equal(129.75, From(Quote(g09), "ironvale").LandedPrice!.Value, 9);
+        var forecast = Assert.Single(new LandedCostEngine().Forecast(g09.ToState()));
+        Assert.Equal((2550.0, 0.5, 1275.0), (forecast.ExposurePerGameDay!.Value, forecast.Scale!.Value, forecast.ForecastSpendPerGameDay!.Value));
+    }
+
+    [Fact]
     public void G10_edge_cases_stay_finite_and_respect_direction()
     {
         var q = Quote(Scenarios.Build("G10"));

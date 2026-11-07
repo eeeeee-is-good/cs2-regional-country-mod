@@ -21,13 +21,30 @@ namespace Regions.Engine
     /// </summary>
     public sealed class LandedCostEngine : IRegionalEngine
     {
-        /// <summary>0.2.0: A4 supply rule (Provisional and missing figures are downgraded instead of excluded).</summary>
-        public const string EngineVersion = "0.2.0";
+        /// <summary>0.2.0: A4 supply rule. 0.3.0: A7 import tariffs and budget-capped freight subsidies.</summary>
+        public const string EngineVersion = "0.3.0";
 
         private static readonly TransportMode[] AllModes =
             (TransportMode[])System.Enum.GetValues(typeof(TransportMode));
 
         public InvariantReport Check(RegionState state) => new InvariantChecker(this).Check(state);
+
+        /// <summary>Forecast for every policy in the manifest, sorted by policy id. Estimates only, never cash (log §17.7).</summary>
+        public IReadOnlyList<PolicyForecast> Forecast(RegionState state)
+        {
+            if (state == null) throw new ArgumentNullException(nameof(state));
+            var problems = RegionStateValidator.Validate(state);
+            if (problems.Count > 0) throw new RegionStateException(problems);
+
+            var m = state.Manifest;
+            var policies = m.Parameters.Policies ?? new PolicySet();
+            var latest = state.LatestSnapshots.ToDictionary(p => p.Snapshot.CityId, StringComparer.Ordinal);
+            var graph = new RouteGraph(m, latest);
+            return policies.ImportTariffs.Select(PolicyEvaluator.Forecast)
+                .Concat(policies.FreightSubsidies.Select(s => PolicyEvaluator.Forecast(s, state, graph, latest)))
+                .OrderBy(f => f.PolicyId, StringComparer.Ordinal)
+                .ToList();
+        }
 
         public QuoteResult Quote(RegionState state, QuoteRequest request)
         {
@@ -47,6 +64,16 @@ namespace Regions.Engine
             var price = m.Parameters.ResourcePrices.FirstOrDefault(r => string.Equals(r.ResourceId, request.ResourceId, StringComparison.Ordinal));
             var graph = new RouteGraph(m, latest);
             var costs = m.Parameters.ModeCosts.ToDictionary(c => c.Mode);
+            var links = m.Links.ToDictionary(l => l.LinkId, StringComparer.Ordinal);
+
+            // Policies for this resource (log §17.4): customs on World offers, budget-scaled freight subsidies on City offers.
+            var tariffs = PolicyEvaluator.Tariffs(m, request.ResourceId).ToList();
+            var subsidies = PolicyEvaluator.Subsidies(m, request.ResourceId)
+                .Select(s => (Policy: s, Scale: PolicyEvaluator.Forecast(s, state, graph, latest).Scale ?? 1.0))
+                .ToList();
+            double SubsidyFor(Route route) =>
+                subsidies.Sum(s => s.Scale * PolicyEvaluator.SubsidyPerUnit(s.Policy, route.LinkIds, links, costs));
+            double TariffFor(double worldPrice) => tariffs.Sum(t => PolicyEvaluator.TariffPerUnit(t, worldPrice));
 
             var offers = new List<Offer>();
 
@@ -57,7 +84,7 @@ namespace Regions.Engine
                 if (!latest.TryGetValue(city.CityId, out var pub)) continue;
                 var obs = pub.Snapshot.Resources.FirstOrDefault(r => string.Equals(r.ResourceId, request.ResourceId, StringComparison.Ordinal));
                 if (obs == null) continue;
-                offers.Add(CityOffer(state, graph, dest, pub, obs, resource, price));
+                offers.Add(CityOffer(state, graph, dest, pub, obs, resource, price, SubsidyFor));
             }
 
             // One offer per world gateway of the destination, ordered by endpoint key.
@@ -65,7 +92,7 @@ namespace Regions.Engine
                          .Where(g => string.Equals(g.CityId, dest, StringComparison.Ordinal))
                          .OrderBy(g => g.EndpointKey, StringComparer.Ordinal))
             {
-                offers.Add(WorldOffer(latest, costs, gw, resource, price));
+                offers.Add(WorldOffer(latest, costs, gw, resource, price, TariffFor));
             }
 
             int? selected = null;
@@ -97,7 +124,8 @@ namespace Regions.Engine
 
         // Exclusion precedence (Contracts/README.md): UnknownResource -> NoPath/ModeIncompatible -> StaleSnapshot -> UnknownSupply -> NoSupply.
         private static Offer CityOffer(RegionState state, RouteGraph graph, string dest, PublishedSnapshot pub,
-                                       ResourceObservation obs, ResourceDefinition? resource, ResourcePrice? price)
+                                       ResourceObservation obs, ResourceDefinition? resource, ResourcePrice? price,
+                                       Func<Route, double> subsidyFor)
         {
             var offer = new Offer
             {
@@ -124,12 +152,14 @@ namespace Regions.Engine
             if (supply.ExcludedReason != null) return Exclude(offer, supply.ExcludedReason.Value);
 
             offer.Path = route.LinkIds.ToList();
-            return Price(offer, price.RegionalProducerPriceIndex, route.Cost);
+            // Domestic trade: never customs (D-44). Freight subsidy only on qualifying links of this path.
+            return Price(offer, price.RegionalProducerPriceIndex, route.Cost, tariff: 0, subsidy: subsidyFor(route));
         }
 
         // World offers: UnknownResource -> NoWorldGateway (gateway endpoint or mode cost missing) -> ModeIncompatible.
         private static Offer WorldOffer(IReadOnlyDictionary<string, PublishedSnapshot> latest, IReadOnlyDictionary<TransportMode, ModeCost> costs,
-                                        WorldGateway gw, ResourceDefinition? resource, ResourcePrice? price)
+                                        WorldGateway gw, ResourceDefinition? resource, ResourcePrice? price,
+                                        Func<double, double> tariffFor)
         {
             var offer = new Offer { OriginKind = OriginKind.World, WorldGatewayEndpointKey = gw.EndpointKey };
 
@@ -141,13 +171,15 @@ namespace Regions.Engine
             var freight = cost.FixedCost + cost.CostPerKm * gw.DistanceKm;
             if (!Num.IsFinite(freight))
                 throw new RegionStateException(new[] { $"worldGateways[{gw.CityId}/{gw.EndpointKey}]: freight cost overflows" });
-            return Price(offer, price.WorldProducerPriceIndex, freight);
+            // Foreign leg: customs applies; domestic freight subsidies never do (log §17.6).
+            return Price(offer, price.WorldProducerPriceIndex, freight, tariff: tariffFor(price.WorldProducerPriceIndex), subsidy: 0);
         }
 
-        private static Offer Price(Offer offer, double producerPrice, double freight)
+        private static Offer Price(Offer offer, double producerPrice, double freight, double tariff, double subsidy)
         {
-            const double tariff = 0, subsidy = 0; // Tariffs and subsidies arrive with A7.
             var landed = producerPrice + freight + tariff - subsidy;
+            if (!Num.IsFiniteNonNegative(tariff) || !Num.IsFiniteNonNegative(subsidy) || subsidy > freight + 1e-9 * Math.Max(1, freight))
+                throw new RegionStateException(new[] { $"policy amounts out of range (tariff {tariff}, subsidy {subsidy}, freight {freight})" });
             if (!Num.IsFiniteNonNegative(landed))
                 throw new RegionStateException(new[] { $"landed price is not finite and non-negative ({landed})" });
 
