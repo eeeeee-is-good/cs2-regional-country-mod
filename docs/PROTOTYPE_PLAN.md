@@ -39,7 +39,7 @@ Dev B runs the V-02/V-03 spikes first, because they decide whether the mod can r
 ### Developer B — read-only CS2 mod (needs the game)
 | ID | Task | Verifies | Done when |
 |---|---|---|---|
-| B0 | Install the toolchain. Record the CS2 build. Run the spikes for framework, serializer and writable folder. Vet agents-plugins before installing. | V-01–V-05, V-29 | Findings written into ASSUMPTIONS.md |
+| B0 | Install the toolchain. Record the CS2 build. Run the spikes for framework, serializer and writable folder. Vet agents-plugins before installing. | V-01–V-05, V-29 | Findings written into ASSUMPTIONS.md. **Static part done 2026-11-06:** game 1.6.2f1 matches the baseline (V-01); lifecycle signatures and the load/save signals confirmed by decompiling (V-05); framework, Newtonsoft and `ModsData/` confirmed on disk (V-02–V-04, partly verified). **Runtime spikes still to run**, folded into the B1 skeleton mod (it loads the Contracts DLL, round-trips JSON, writes to `ModsData/`, logs the lifecycle events). |
 | B1 | Mod skeleton: loads, logs its version, disposes cleanly, registers no writers | V-05 | Clean load/unload in log |
 | B2 | `CapabilityProbe`: game build, active mods, every feature `shadow/off` with a reason, written as JSON | V-26 | Report file produced |
 | B3 | Outside-connection inspector: transport and utility OCs, mode, position, `endpointKey` fingerprint; reload test on a controlled map | V-06–V-08 | Criterion 7 met |
