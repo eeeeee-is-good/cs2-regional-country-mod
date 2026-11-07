@@ -17,6 +17,12 @@ public sealed class PlaygroundModel
     /// <summary>Import tariff on world steel, percent of the world price. 0 = none.</summary>
     public double TariffPercent { get; set; }
     public List<PlaygroundSubsidy> Subsidies { get; set; } = new();
+    /// <summary>Supply/demand pricing (manifest parameters.scarcity). On by default in the sandbox.</summary>
+    public bool ScarcityEnabled { get; set; } = true;
+    /// <summary>Price rise as a fraction of the producer price per 100% overload.</summary>
+    public double ScarcitySlope { get; set; } = 0.25;
+    /// <summary>Maximum rise as a fraction of the producer price.</summary>
+    public double ScarcityCap { get; set; } = 1.0;
 }
 
 public sealed class PlaygroundCity

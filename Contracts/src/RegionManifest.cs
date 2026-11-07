@@ -83,6 +83,21 @@ namespace Regions.Contracts
         /// <summary>Optional in the schema (added within v1 by A7). Writers always write it; a reader treats a missing
         /// value as no policies.</summary>
         public PolicySet Policies { get; set; } = new PolicySet();
+        /// <summary>Optional (added within v1). null = no scarcity pricing: suppliers sell any quantity at their base price.</summary>
+        public ScarcityRule? Scarcity { get; set; }
+    }
+
+    /// <summary>
+    /// Soft supply pressure (log §16.3 caveat, §17.4 step 4). When the demand leaning on a supplier exceeds its
+    /// effective offer, its price rises: premium = producerPrice x min(MaxPremium, PremiumSlope x max(0, load/offer - 1)).
+    /// A modeled price signal, never physical allocation.
+    /// </summary>
+    public sealed class ScarcityRule
+    {
+        /// <summary>Price rise, as a fraction of the producer price, per 100% of overload (0.25 = +25% at twice the offer).</summary>
+        public double PremiumSlope { get; set; }
+        /// <summary>Cap on the rise, as a fraction of the producer price (1.0 = at most double).</summary>
+        public double MaxPremium { get; set; }
     }
 
     /// <summary>Federal landed-cost levers (log §17.4, §17.10). Price effects are modeled; budgets are forecasts, not cash.</summary>

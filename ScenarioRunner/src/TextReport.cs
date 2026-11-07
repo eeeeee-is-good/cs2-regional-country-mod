@@ -33,7 +33,7 @@ public static class TextReport
             return sb.ToString();
         }
 
-        var rows = new List<string[]> { new[] { "", "#", "Origin", "Route", "Producer", "Freight", "Tariff", "Subsidy", "Landed", "Result" } };
+        var rows = new List<string[]> { new[] { "", "#", "Origin", "Route", "Producer", "Scarcity", "Freight", "Tariff", "Subsidy", "Landed", "Result" } };
         for (var i = 0; i < q.Offers.Count; i++)
         {
             var o = q.Offers[i];
@@ -42,12 +42,12 @@ public static class TextReport
             rows.Add(new[]
             {
                 q.SelectedOfferIndex == i ? ">" : "", i.ToString(CultureInfo.InvariantCulture), origin, route,
-                N(o.ProducerPrice), N(o.Freight), N(o.Tariff), N(o.Subsidy), N(o.LandedPrice),
+                N(o.ProducerPrice), N(o.ScarcityPremium), N(o.Freight), N(o.Tariff), N(o.Subsidy), N(o.LandedPrice),
                 Result(o, q.ResourceId) + (o.OriginKind == OriginKind.City && (o.Eligible || o.ExcludedReason is ExcludedReason.NoSupply or ExcludedReason.UnknownSupply) ? SupplyNotes(o) : ""),
             });
         }
         var widths = Enumerable.Range(0, rows[0].Length).Select(c => rows.Max(r => r[c].Length)).ToArray();
-        var numeric = new HashSet<int> { 1, 4, 5, 6, 7, 8 };
+        var numeric = new HashSet<int> { 1, 4, 5, 6, 7, 8, 9 };
         foreach (var r in rows)
         {
             sb.Append("  ");

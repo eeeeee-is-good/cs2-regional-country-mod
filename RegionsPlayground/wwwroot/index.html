@@ -200,6 +200,8 @@ function changed() {
 
 function setModel(m) {
   model = m;
+  // Maps saved before scarcity pricing existed: switch it on with the defaults.
+  if (model.scarcityEnabled === undefined) { model.scarcityEnabled = true; model.scarcitySlope = 0.25; model.scarcityCap = 1; }
   for (const mode of MODES) if (!model.subsidies.some(s => s.mode === mode)) model.subsidies.push({ mode, percent: 0, budget: 5000 });
   selected = null; linkFrom = null;
   renderEditor(); renderPolicyControls(); renderSettings();
@@ -208,6 +210,71 @@ function setModel(m) {
 
 // ---------- map ----------
 function quoteFor(id) { return analysis?.cities?.[id]?.quote || null; }
+function marketFor(id) { return (analysis?.markets || []).find(m => m.cityId === id) || null; }
+
+// ---------- supply and demand chart for one producer (prices at the mill gate, before freight) ----------
+function marketChart(m) {
+  const W = 360, H = 230, L = 46, R = 12, T = 14, B = 34;
+  const buyers = [...m.buyers].sort((a, b) => (b.switchPrice ?? Infinity) - (a.switchPrice ?? Infinity));
+  const totalDemand = buyers.reduce((s, b) => s + b.demand, 0);
+  const finiteSw = buyers.map(b => b.switchPrice).filter(x => x != null);
+  const capPrice = m.basePrice * (1 + m.cap);
+  const yTop = Math.max(m.gatePrice, m.basePrice * 1.25, ...finiteSw.map(x => Math.min(x, capPrice * 1.1))) * 1.06;
+  const yBot = m.basePrice * 0.94;
+  const xMax = Math.max(m.spareSupply * 2, totalDemand * 1.2, m.load * 1.2, 1);
+  const X = q => L + Math.min(q, xMax) / xMax * (W - L - R);
+  const Y = p => T + (1 - (Math.min(Math.max(p, yBot), yTop) - yBot) / (yTop - yBot)) * (H - T - B);
+
+  // supply curve: flat at the base price up to the spare supply, then rising until the cap
+  const sup = [[0, m.basePrice], [m.spareSupply, m.basePrice]];
+  if (m.slope > 0) {
+    const steps = 30;
+    for (let i = 1; i <= steps; i++) {
+      const q = m.spareSupply + (xMax - m.spareSupply) * i / steps;
+      sup.push([q, m.basePrice * (1 + Math.min(m.cap, m.slope * (q / m.spareSupply - 1)))]);
+    }
+  } else sup.push([xMax, m.basePrice]);
+  const supPath = sup.map(([q, p], i) => `${i ? "L" : "M"}${X(q).toFixed(1)},${Y(p).toFixed(1)}`).join(" ");
+
+  // demand: a falling step for each city, at the gate price where it would switch to its next-best option
+  let dPath = "", q = 0, labels = "";
+  buyers.forEach((b, i) => {
+    const y = Y(b.switchPrice ?? yTop);
+    dPath += i === 0 ? `M${X(0)},${y}` : ` V${y}`;
+    dPath += ` H${X(q + b.demand)}`;
+    labels += `<text x="${(X(q) + X(q + b.demand)) / 2}" y="${y - 4}" text-anchor="middle" fill="#ffb3d9" font-size="10">${esc(cityName(b.cityId))}</text>`;
+    q += b.demand;
+  });
+  if (buyers.length) dPath += ` V${Y(yBot)}`;
+
+  const eqX = X(m.load), eqY = Y(m.gatePrice);
+  const svgChart = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Supply and demand for ${esc(cityName(m.cityId))}'s steel">
+    <rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="#0e161f" rx="4"/>
+    <line x1="${X(m.spareSupply)}" y1="${T}" x2="${X(m.spareSupply)}" y2="${H - B}" stroke="#3a4757" stroke-dasharray="3 4"/>
+    <text x="${X(m.spareSupply)}" y="${H - B + 12}" text-anchor="middle" fill="#8b9bb0" font-size="10">spare ${fmt(m.spareSupply, 0)}</text>
+    <line x1="${L}" y1="${Y(m.basePrice)}" x2="${W - R}" y2="${Y(m.basePrice)}" stroke="#3a4757" stroke-dasharray="3 4"/>
+    <text x="${L - 4}" y="${Y(m.basePrice) + 4}" text-anchor="end" fill="#8b9bb0" font-size="10">${fmt(m.basePrice, 0)}</text>
+    <text x="${L - 4}" y="${Y(yTop) + 10}" text-anchor="end" fill="#8b9bb0" font-size="10">${fmt(yTop, 0)}</text>
+    <path d="${supPath}" fill="none" stroke="#4fd1c5" stroke-width="2.5"/>
+    ${buyers.length ? `<path d="${dPath}" fill="none" stroke="#ff7ab8" stroke-width="2.5"/>` : ""}
+    ${labels}
+    ${buyers.length ? `<circle cx="${eqX}" cy="${eqY}" r="5" fill="#ffe08a" stroke="#0b1219" stroke-width="2"/>
+      <text x="${Math.min(eqX + 8, W - R - 70)}" y="${eqY - 8}" fill="#ffe08a" font-size="11" font-weight="700">${fmt(m.gatePrice)}</text>` : ""}
+    <text x="${(L + W - R) / 2}" y="${H - 6}" text-anchor="middle" fill="#8b9bb0" font-size="10">steel per day</text>
+    <text x="10" y="${(T + H - B) / 2}" text-anchor="middle" fill="#8b9bb0" font-size="10" transform="rotate(-90 10 ${(T + H - B) / 2})">price at the mill</text>
+  </svg>`;
+
+  const status = { Served: "buys here", Indifferent: "on the edge: an import or another supplier costs the same", PricedOut: "buys elsewhere at this price" };
+  const verdict = !buyers.length ? "No city needs this steel right now, so it sells at the normal price."
+    : m.premium > 1e-9 ? `Demand is ${fmt(m.pressure, 2)}× its spare steel, so the price rises by ${fmt(m.premium)} (${fmt(m.premium / m.basePrice * 100, 1)}%).`
+    : "It has enough spare steel for everyone leaning on it, so there is no price rise.";
+  return `<h2 style="margin-top:14px">${esc(cityName(m.cityId))}'s steel market</h2>
+    <div class="legend"><span><i style="background:#4fd1c5"></i>supply</span><span><i style="background:#ff7ab8"></i>demand</span><span><i style="background:#ffe08a"></i>price where they meet</span></div>
+    ${svgChart}
+    <p class="small">${verdict}</p>
+    ${buyers.length ? `<table><tr><th>City</th><th>Needs/day</th><th>Leaves above</th></tr>${buyers.map(b =>
+      `<tr><td>${esc(cityName(b.cityId))}<div class="reason">${status[b.status]}</div></td><td>${fmt(b.demand, 0)}</td><td>${b.switchPrice == null ? "never" : fmt(b.switchPrice)}</td></tr>`).join("")}</table>` : ""}`;
+}
 function bestOffer(id) { const q = quoteFor(id); return q && q.selectedOfferIndex != null ? q.offers[q.selectedOfferIndex] : null; }
 
 function worldAnchor(c) {
@@ -308,9 +375,11 @@ function renderMap() {
     s += `<circle r="22" fill="${color}" stroke="${sel ? "#fff" : "#0b1219"}" stroke-width="3"/>`;
     s += `<text y="6" text-anchor="middle" font-size="17">${surplus ? "🏭" : "🏙️"}</text>`;
     s += `<text class="city-label" y="-32" text-anchor="middle">${esc(c.name)}</text>`;
-    // A producing city does not import from itself: show that it makes steel instead of a price.
-    const label = p != null ? fmt(p, 2) : surplus ? "makes steel" : "no supply";
-    const pillFill = p != null ? color : surplus ? "#1d5c58" : "#2a3a4c";
+    // A producing city does not import from itself: show that it makes steel, and its raised price when overloaded.
+    const mk = surplus ? marketFor(c.id) : null;
+    const squeezed = mk && mk.premium > 1e-9;
+    const label = p != null ? fmt(p, 2) : squeezed ? `sells at ${fmt(mk.gatePrice, 2)}` : surplus ? "makes steel" : "no supply";
+    const pillFill = p != null ? color : squeezed ? "#7a5a1e" : surplus ? "#1d5c58" : "#2a3a4c";
     const w = label.length * 7.5 + 16;
     s += `<rect x="${-w / 2}" y="28" width="${w}" height="20" rx="10" fill="${pillFill}" stroke="#0b1219" stroke-width="2"/>`;
     s += `<text class="price-pill" y="43" text-anchor="middle" fill="${p == null ? "#d6f5f2" : "#06120d"}">${label}</text>`;
@@ -454,24 +523,24 @@ function renderEditor() {
     const c = city(selected.id); if (!c) { selected = null; renderEditor(); return; }
     const st = c.steel;
     el.innerHTML = `<h2>City</h2>
-      <div class="field"><span>Name</span><input data-f="name" value="${esc(c.name)}"></div>
+      <label class="field"><span>Name</span><input data-f="name" value="${esc(c.name)}"></label>
       <label class="check"><input type="checkbox" data-f="hasSteel" ${st ? "checked" : ""}> Reports steel (production and use)</label>
       ${st ? `
-        <div class="field"><span>Output per day</span><input type="number" min="0" data-f="output" value="${st.output ?? ""}" placeholder="unknown"></div>
-        <div class="field"><span>Used locally per day</span><input type="number" min="0" data-f="inputUse" value="${st.inputUse ?? ""}" placeholder="unknown"></div>
-        <div class="field"><span>Capacity per day</span><input type="number" min="0" data-f="capacity" value="${st.capacity ?? ""}" placeholder="unknown"></div>
-        <div class="field"><span>How sure are the figures?</span><select data-f="confidence">
-          ${["Validated", "Provisional", "Unknown"].map(v => `<option ${st.confidence === v ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+        <label class="field"><span>Output per day</span><input type="number" min="0" data-f="output" value="${st.output ?? ""}" placeholder="unknown"></label>
+        <label class="field"><span>Used locally per day</span><input type="number" min="0" data-f="inputUse" value="${st.inputUse ?? ""}" placeholder="unknown"></label>
+        <label class="field"><span>Capacity per day</span><input type="number" min="0" data-f="capacity" value="${st.capacity ?? ""}" placeholder="unknown"></label>
+        <label class="field"><span>How sure are the figures?</span><select data-f="confidence">
+          ${["Validated", "Provisional", "Unknown"].map(v => `<option ${st.confidence === v ? "selected" : ""}>${v}</option>`).join("")}</select></label>
         <div class="small muted">Leave a box empty if it is unknown. Unknown is never treated as zero.</div>` : ""}
       <label class="check"><input type="checkbox" data-f="hasWorld" ${c.worldGatewayKm != null ? "checked" : ""}> Connected to the world market</label>
-      ${c.worldGatewayKm != null ? `<div class="field"><span>Distance to the world (km)</span><input type="number" min="0" data-f="worldKm" value="${c.worldGatewayKm}"></div>` : ""}
+      ${c.worldGatewayKm != null ? `<label class="field"><span>Distance to the world (km)</span><input type="number" min="0" data-f="worldKm" value="${c.worldGatewayKm}"></label>` : ""}
       <div class="row"><button class="danger" data-action="delete">Delete city</button></div>`;
   } else {
     const l = link(selected.id); if (!l) { selected = null; renderEditor(); return; }
     el.innerHTML = `<h2>Link</h2>
       <h3>${esc(cityName(l.a))} ${l.oneWay ? "→" : "↔"} ${esc(cityName(l.b))}</h3>
-      <div class="field"><span>Transport</span><select data-f="mode">${MODES.map(m => `<option ${l.mode === m ? "selected" : ""}>${m}</option>`).join("")}</select></div>
-      <div class="field"><span>Distance (km)</span><input type="number" min="0" data-f="distanceKm" value="${l.distanceKm}"></div>
+      <label class="field"><span>Transport</span><select data-f="mode">${MODES.map(m => `<option ${l.mode === m ? "selected" : ""}>${m}</option>`).join("")}</select></label>
+      <label class="field"><span>Distance (km)</span><input type="number" min="0" data-f="distanceKm" value="${l.distanceKm}"></label>
       <label class="check"><input type="checkbox" data-f="autoDistance" ${l.autoDistance ? "checked" : ""}> Follow the map distance</label>
       <label class="check"><input type="checkbox" data-f="oneWay" ${l.oneWay ? "checked" : ""}> One way (${esc(cityName(l.a))} → ${esc(cityName(l.b))})</label>
       <label class="check"><input type="checkbox" data-f="broken" ${l.broken ? "checked" : ""}> Broken (closed)</label>
@@ -556,10 +625,20 @@ function renderResults() {
     const me = analysis.cities[selected.id];
     const maxLanded = Math.max(1, ...q.offers.filter(o => o.eligible).map(o => o.landedPrice + o.subsidy));
     const win = q.selectedOfferIndex != null ? q.offers[q.selectedOfferIndex] : null;
-    let h = `<h2>Steel price</h2><h3>Steel delivered to ${esc(cityName(q.destCityId))}</h3>`;
-    h += win
-      ? `<p>Cheapest: <b>${esc(win.originKind === "World" ? "the world market" : cityName(win.originCityId))}</b> at <b>${fmt(win.landedPrice)}</b></p>`
-      : `<p class="muted">No offer can reach this city. It has no regional route to a supplier with spare steel, and no usable world connection.</p>`;
+    const producer = hasSurplus(city(selected.id));
+    const market = marketFor(selected.id);
+    let h = "";
+    if (producer) {
+      // A producer: its own market is the interesting part; imports are only for comparison.
+      h += market ? marketChart(market).replace('style="margin-top:14px"', "") : `<h2>Steel</h2><p>${esc(cityName(selected.id))} makes its own steel.</p>`;
+      h += `<h2 style="margin-top:14px">If it bought steel instead</h2><p class="small muted">It makes its own steel, so it does not import. Other offers, for comparison:</p>`;
+    } else {
+      h += `<h2>Steel price</h2><h3>Steel delivered to ${esc(cityName(q.destCityId))}</h3>`;
+      if (me?.demand > 0) h += `<p class="small">Needs <b>${fmt(me.demand, 0)}</b> steel per day (uses more than it makes).</p>`;
+      h += win
+        ? `<p>Cheapest: <b>${esc(win.originKind === "World" ? "the world market" : cityName(win.originCityId))}</b> at <b>${fmt(win.landedPrice)}</b></p>`
+        : `<p class="muted">No offer can reach this city. It has no regional route to a supplier with spare steel, and no usable world connection.</p>`;
+    }
     if (!q.offers.length) h += `<p class="muted small">No other city reports steel, and this city has no world connection.</p>`;
     q.offers.forEach((o, i) => {
       const name = o.originKind === "World" ? "World market" : cityName(o.originCityId);
@@ -568,18 +647,19 @@ function renderResults() {
         <div class="top"><span class="name">${esc(name)}</span><span class="price">${o.eligible ? fmt(o.landedPrice) : "–"}</span></div>`;
       if (o.eligible) {
         const pct = v => `${Math.max(0, v) / maxLanded * 100}%`;
-        h += `<div class="bar"><i style="width:${pct(o.producerPrice - 0)};background:#6c7a8c"></i><i style="width:${pct(o.freight - o.subsidy)};background:#3fa7f5"></i><i style="width:${pct(o.subsidy)};background:repeating-linear-gradient(45deg,#3ecf8e 0 4px,transparent 4px 7px)"></i><i style="width:${pct(o.tariff)};background:#ff6b6b"></i></div>
-          <div class="reason">${esc(routeText(o))} · producer ${fmt(o.producerPrice)} + freight ${fmt(o.freight)}${o.tariff ? ` + customs ${fmt(o.tariff)}` : ""}${o.subsidy ? ` − subsidy ${fmt(o.subsidy)}` : ""}${o.effectiveRegionalOfferPerGameDay != null ? ` · offers ${fmt(o.effectiveRegionalOfferPerGameDay, 0)}/day` : ""}</div>`;
+        h += `<div class="bar"><i style="width:${pct(o.producerPrice - 0)};background:#6c7a8c"></i><i style="width:${pct(o.scarcityPremium || 0)};background:#f5b84a"></i><i style="width:${pct(o.freight - o.subsidy)};background:#3fa7f5"></i><i style="width:${pct(o.subsidy)};background:repeating-linear-gradient(45deg,#3ecf8e 0 4px,transparent 4px 7px)"></i><i style="width:${pct(o.tariff)};background:#ff6b6b"></i></div>
+          <div class="reason">${esc(routeText(o))} · producer ${fmt(o.producerPrice)}${o.scarcityPremium ? ` + scarcity ${fmt(o.scarcityPremium)}` : ""} + freight ${fmt(o.freight)}${o.tariff ? ` + customs ${fmt(o.tariff)}` : ""}${o.subsidy ? ` − subsidy ${fmt(o.subsidy)}` : ""}${o.effectiveRegionalOfferPerGameDay != null ? ` · offers ${fmt(o.effectiveRegionalOfferPerGameDay, 0)}/day` : ""}</div>`;
       } else {
         h += `<div class="reason">Excluded: ${esc(REASONS[o.excludedReason] || o.excludedReason)}${o.effectiveRegionalOfferPerGameDay != null ? ` (${fmt(o.effectiveRegionalOfferPerGameDay, 0)}/day)` : ""}</div>`;
       }
       if (notes.length) h += `<div class="reason">Data: ${esc(notes.join(", "))}</div>`;
       h += `</div>`;
     });
-    h += `<div class="legend" style="margin-top:8px"><span><i style="background:#6c7a8c"></i>producer price</span><span><i style="background:#3fa7f5"></i>freight</span><span><i style="background:#3ecf8e"></i>subsidy</span><span><i style="background:#ff6b6b"></i>customs</span></div>`;
+    h += `<div class="legend" style="margin-top:8px"><span><i style="background:#6c7a8c"></i>producer price</span><span><i style="background:#f5b84a"></i>scarcity</span><span><i style="background:#3fa7f5"></i>freight</span><span><i style="background:#3ecf8e"></i>subsidy</span><span><i style="background:#ff6b6b"></i>customs</span></div>`;
     if (me?.supplyNotes || me?.effectiveOffer != null || me?.supplyExcluded) {
       h += `<p class="small muted" style="margin-top:10px">As a supplier: ${me.supplyExcluded ? esc(REASONS[me.supplyExcluded] || me.supplyExcluded) : `offers ${fmt(me.effectiveOffer, 0)} per day to other cities`}${me.supplyNotes?.length ? ` (${esc(me.supplyNotes.join(", "))})` : ""}.</p>`;
     }
+    if (market && !producer) h += marketChart(market);
     h += `<p class="small muted">Trace ${esc(q.provenance.traceId)} · modeled price quote, not a physical trade · applied to game: ${q.appliedToGame ? "yes" : "no"}</p>`;
     el.innerHTML = h;
   }
@@ -624,18 +704,26 @@ $("policyControls").addEventListener("input", e => {
 function renderSettings() {
   const cost = m => model.costs.find(c => c.mode === m);
   $("settings").innerHTML = `
-    <div class="field"><span>Regional steel producer price</span><input type="number" min="0" data-s="regionalPrice" value="${model.regionalPrice}"></div>
-    <div class="field"><span>World steel price</span><input type="number" min="0" data-s="worldPrice" value="${model.worldPrice}"></div>
+    <label class="field"><span>Regional steel producer price</span><input type="number" min="0" data-s="regionalPrice" value="${model.regionalPrice}"></label>
+    <label class="field"><span>World steel price</span><input type="number" min="0" data-s="worldPrice" value="${model.worldPrice}"></label>
     <table style="margin-top:8px"><tr><th>Mode</th><th>Fixed cost</th><th>Cost per km</th></tr>
     ${MODES.map(m => `<tr><td>${m}</td><td><input type="number" min="0" step="1" data-s="fixed-${m}" value="${cost(m)?.fixed ?? 0}" style="width:80px"></td>
       <td><input type="number" min="0" step="0.01" data-s="perKm-${m}" value="${cost(m)?.perKm ?? 0}" style="width:80px"></td></tr>`).join("")}</table>
-    <div class="small muted" style="margin-top:6px">Freight on a link = fixed cost + cost per km × distance. These are model inputs, not game values.</div>`;
+    <div class="small muted" style="margin-top:6px">Freight on a link = fixed cost + cost per km × distance. These are model inputs, not game values.</div>
+    <h2 style="margin-top:14px">Supply and demand</h2>
+    <label class="check"><input type="checkbox" data-s="scarcityEnabled" ${model.scarcityEnabled ? "checked" : ""}> Scarcity pricing: overloaded producers charge more</label>
+    <label class="field"><span>Price rise per 100% overload (%)</span><input type="number" min="0" step="5" data-s="scarcitySlopePct" value="${Math.round(model.scarcitySlope * 100)}"></label>
+    <label class="field"><span>Maximum price rise (%)</span><input type="number" min="0" step="10" data-s="scarcityCapPct" value="${Math.round(model.scarcityCap * 100)}"></label>
+    <div class="small muted">A producer sells its spare steel at the normal price. When cities need more than that, its price climbs along the supply curve, until buyers would rather import or buy elsewhere.</div>`;
 }
 
 $("settings").addEventListener("input", e => {
   const s = e.target.dataset.s; if (!s) return;
   const v = Number(e.target.value);
-  if (s === "regionalPrice" || s === "worldPrice") model[s] = v;
+  if (s === "scarcityEnabled") model.scarcityEnabled = e.target.checked;
+  else if (s === "scarcitySlopePct") model.scarcitySlope = Math.max(0, v) / 100;
+  else if (s === "scarcityCapPct") model.scarcityCap = Math.max(0, v) / 100;
+  else if (s === "regionalPrice" || s === "worldPrice") model[s] = v;
   else {
     const [field, mode] = s.split("-");
     let c = model.costs.find(c => c.mode === mode);

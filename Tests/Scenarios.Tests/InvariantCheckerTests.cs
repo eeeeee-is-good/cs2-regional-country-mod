@@ -116,6 +116,13 @@ public class InvariantCheckerTests
             foreach (var o in q.Offers.Where(o => o.Eligible && o.OriginKind == OriginKind.City)) { o.Subsidy = o.Freight + 5; o.LandedPrice = o.ProducerPrice - 5; }
         }, Scenarios.Build("G05").ToState());
 
+    [Fact]
+    public void Detects_scarcity_premium_on_world_offers_or_without_a_rule() =>
+        AssertCatches(InvariantChecker.NumericSafety, (_, q) =>
+        {
+            foreach (var o in q.Offers.Where(o => o.Eligible)) { o.ScarcityPremium = 3; o.LandedPrice += 3; }
+        });
+
     private static void AssertCatches(string invariant, Action<RegionState, QuoteResult> corrupt, RegionState? state = null)
     {
         var report = new BrokenEngine(corrupt).Check(state ?? Golden());

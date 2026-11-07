@@ -4,8 +4,34 @@ using Regions.Simulator;
 
 namespace Regions.Playground;
 
+/// <summary>One supplier's supply/demand market, made JSON-safe (no infinities).</summary>
+public sealed class PlaygroundMarket
+{
+    public string CityId { get; set; } = "";
+    public double BasePrice { get; set; }
+    public double SpareSupply { get; set; }
+    public double Slope { get; set; }
+    public double Cap { get; set; }
+    public double Premium { get; set; }
+    public double GatePrice { get; set; }
+    public double Load { get; set; }
+    public double Pressure { get; set; }
+    public List<PlaygroundBuyer> Buyers { get; set; } = new();
+}
+
+public sealed class PlaygroundBuyer
+{
+    public string CityId { get; set; } = "";
+    public double Demand { get; set; }
+    /// <summary>null = no other option at any price.</summary>
+    public double? SwitchPrice { get; set; }
+    public BuyerStatus Status { get; set; }
+}
+
 public sealed class CityAnalysis
 {
+    /// <summary>Steel this city needs per day (use - output, both measured, figures trusted); 0 otherwise.</summary>
+    public double Demand { get; set; }
     public QuoteResult? Quote { get; set; }
     /// <summary>This city's own steel as a supplier: effective offer, exclusion reason and the factors applied (A4).</summary>
     public double? EffectiveOffer { get; set; }
@@ -22,6 +48,8 @@ public sealed class Analysis
     public int QuotesChecked { get; set; }
     public List<string> Violations { get; set; } = new();
     public IReadOnlyList<PolicyForecast> Policies { get; set; } = Array.Empty<PolicyForecast>();
+    /// <summary>Per supplier, when scarcity pricing is on.</summary>
+    public List<PlaygroundMarket> Markets { get; set; } = new();
     public string EngineVersion { get; set; } = LandedCostEngine.EngineVersion;
 }
 
@@ -37,9 +65,13 @@ public static class Playground
 
     public static readonly TransportMode[] Modes = { TransportMode.Road, TransportMode.Rail, TransportMode.Ship };
 
+    public const double DefaultScarcitySlope = 0.25;
+    public const double DefaultScarcityCap = 1.0;
+
     public static PlaygroundModel Empty() => new()
     {
         Costs = DefaultCosts(),
+        ScarcityEnabled = true, ScarcitySlope = DefaultScarcitySlope, ScarcityCap = DefaultScarcityCap,
         Subsidies = Modes.Select(m => new PlaygroundSubsidy { Mode = m, Percent = 0, Budget = 5000 }).ToList(),
     };
 
@@ -83,6 +115,9 @@ public static class Playground
 
         manifest.Parameters.ModeCosts = model.Costs.Select(c => new ModeCost { Mode = c.Mode, FixedCost = c.Fixed, CostPerKm = c.PerKm }).ToList();
         manifest.Parameters.ResourcePrices = new() { new ResourcePrice { ResourceId = Resource, RegionalProducerPriceIndex = model.RegionalPrice, WorldProducerPriceIndex = model.WorldPrice } };
+
+        if (model.ScarcityEnabled)
+            manifest.Parameters.Scarcity = new ScarcityRule { PremiumSlope = model.ScarcitySlope, MaxPremium = model.ScarcityCap };
 
         if (model.TariffPercent > 0)
             manifest.Parameters.Policies.ImportTariffs.Add(new ImportTariff { PolicyId = "tariff-steel", ResourceId = Resource, AdValoremPercent = model.TariffPercent });
@@ -129,6 +164,8 @@ public static class Playground
                 var obs = state.LatestSnapshots.First(p => p.Snapshot.CityId == c.Id).Snapshot.Resources.FirstOrDefault();
                 if (obs != null)
                 {
+                    if (obs.Confidence != Confidence.Unknown && obs.RealizedOutputPerGameDay is double output && obs.InputUsePerGameDay is double use)
+                        analysis.Demand = Math.Max(0, use - output);
                     var supply = SupplyRule.Evaluate(obs);
                     analysis.EffectiveOffer = supply.EffectiveOfferPerGameDay;
                     analysis.SupplyExcluded = supply.ExcludedReason;
@@ -142,6 +179,16 @@ public static class Playground
             result.QuotesChecked = report.QuotesChecked;
             result.Violations = report.Violations.Select(v => v.ToString()).ToList();
             result.Policies = engine.Forecast(state);
+            result.Markets = engine.Markets(state, Resource).Select(m => new PlaygroundMarket
+            {
+                CityId = m.CityId, BasePrice = m.BasePrice, SpareSupply = m.SpareSupply, Slope = m.PremiumSlope, Cap = m.MaxPremium,
+                Premium = m.Premium, GatePrice = m.GatePrice, Load = m.Load, Pressure = m.Pressure,
+                Buyers = m.Buyers.Select(b => new PlaygroundBuyer
+                {
+                    CityId = b.CityId, Demand = b.Demand, Status = b.Status,
+                    SwitchPrice = double.IsInfinity(b.SwitchPrice) ? null : b.SwitchPrice,
+                }).ToList(),
+            }).ToList();
         }
         catch (RegionStateException ex)
         {
@@ -161,6 +208,10 @@ public static class Playground
             RegionalPrice = m.Parameters.ResourcePrices.FirstOrDefault(p => p.ResourceId == Resource)?.RegionalProducerPriceIndex ?? 100,
             WorldPrice = m.Parameters.ResourcePrices.FirstOrDefault(p => p.ResourceId == Resource)?.WorldProducerPriceIndex ?? 128,
             TariffPercent = m.Parameters.Policies.ImportTariffs.FirstOrDefault(t => t.ResourceId == Resource)?.AdValoremPercent ?? 0,
+            // Examples without a scarcity rule open with the sandbox default switched on, so supply and demand matter.
+            ScarcityEnabled = true,
+            ScarcitySlope = m.Parameters.Scarcity?.PremiumSlope ?? DefaultScarcitySlope,
+            ScarcityCap = m.Parameters.Scarcity?.MaxPremium ?? DefaultScarcityCap,
             Subsidies = Modes.Select(mode =>
             {
                 var s = m.Parameters.Policies.FreightSubsidies.FirstOrDefault(x => x.ResourceId == Resource && x.Mode == mode);

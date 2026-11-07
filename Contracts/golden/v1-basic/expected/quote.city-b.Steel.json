@@ -14,6 +14,7 @@
       "freight": 34,
       "tariff": 0,
       "subsidy": 0,
+      "scarcityPremium": 0,
       "landedPrice": 134,
       "supplierSnapshot": { "cityId": "city-a", "seq": 1, "regionSeq": 1 },
       "effectiveRegionalOfferPerGameDay": 300
@@ -29,6 +30,7 @@
       "freight": null,
       "tariff": null,
       "subsidy": null,
+      "scarcityPremium": null,
       "landedPrice": null,
       "supplierSnapshot": { "cityId": "city-c", "seq": 1, "regionSeq": 3 },
       "effectiveRegionalOfferPerGameDay": null
@@ -44,6 +46,7 @@
       "freight": 12,
       "tariff": 0,
       "subsidy": 0,
+      "scarcityPremium": 0,
       "landedPrice": 140,
       "supplierSnapshot": null,
       "effectiveRegionalOfferPerGameDay": null

@@ -83,7 +83,7 @@ namespace Regions.Engine
                 void Fail(string invariant, string message) => report.Violations.Add(new InvariantViolation(invariant, dest, resourceId, message));
 
                 CheckLabeling(q, Fail);
-                CheckNumbers(q, Fail);
+                CheckNumbers(q, m.Parameters.Scarcity?.MaxPremium, Fail);
                 CheckSelection(q, Fail);
                 CheckPaths(state, q, Fail);
                 CheckIsolation(state, request, q, report, Fail);
@@ -111,7 +111,7 @@ namespace Regions.Engine
             if (string.IsNullOrEmpty(q.Provenance.TraceId)) fail(EvidenceLabeling, "quote has no traceId");
         }
 
-        private static void CheckNumbers(QuoteResult q, Action<string, string> fail)
+        private static void CheckNumbers(QuoteResult q, double? maxScarcity, Action<string, string> fail)
         {
             for (var i = 0; i < q.Offers.Count; i++)
             {
@@ -129,8 +129,14 @@ namespace Regions.Engine
                     fail(NumericSafety, $"offer {i}: a price component is null, negative or not finite");
                     continue;
                 }
-                var sum = o.ProducerPrice!.Value + o.Freight!.Value + o.Tariff!.Value - o.Subsidy!.Value;
+                var scarcity = o.ScarcityPremium ?? 0;
+                if (!Num.IsFiniteNonNegative(scarcity)) { fail(NumericSafety, $"offer {i}: scarcity premium is negative or not finite"); continue; }
+                var sum = o.ProducerPrice!.Value + scarcity + o.Freight!.Value + o.Tariff!.Value - o.Subsidy!.Value;
                 if (!Close(sum, o.LandedPrice!.Value)) fail(NumericSafety, $"offer {i}: components sum to {F(sum)}, landedPrice is {F(o.LandedPrice.Value)}");
+                if (o.OriginKind == OriginKind.World && scarcity != 0) fail(NumericSafety, $"offer {i}: regional scarcity premium {F(scarcity)} on a world offer");
+                if (maxScarcity is double cap && scarcity > cap * o.ProducerPrice.Value + Tolerance(o.ProducerPrice.Value))
+                    fail(NumericSafety, $"offer {i}: scarcity premium {F(scarcity)} above the cap ({F(cap)} of the producer price)");
+                if (maxScarcity == null && scarcity != 0) fail(NumericSafety, $"offer {i}: scarcity premium {F(scarcity)} but the region has no scarcity rule");
                 if (o.Subsidy!.Value > o.Freight!.Value + Tolerance(o.Freight.Value)) fail(SubsidySpecificity, $"offer {i}: subsidy {F(o.Subsidy)} exceeds freight {F(o.Freight)}");
                 if (o.OriginKind == OriginKind.City && o.Tariff!.Value != 0) fail(TariffSpecificity, $"offer {i}: customs tariff {F(o.Tariff)} on a domestic offer");
                 if (o.OriginKind == OriginKind.World && o.Subsidy!.Value != 0) fail(SubsidySpecificity, $"offer {i}: domestic freight subsidy {F(o.Subsidy)} on a world offer");
@@ -184,6 +190,10 @@ namespace Regions.Engine
         /// price, freight, customs) and must not make any offer cheaper. Budget-capped subsidies are shared region-wide
         /// (PolicyEvaluator), so a bigger supplier elsewhere may legitimately dilute a subsidy and raise a price: that is
         /// budget competition, not a phantom benefit.
+        /// With a scarcity rule, extra supply anywhere can also relieve pressure on a reachable supplier through cities
+        /// both can serve: real, indirect competition (log §18.4 #1 forbids a *direct* effect). The "never cheaper"
+        /// check therefore applies to the full price only when the region has no scarcity rule; the market layer
+        /// (producer price, freight, customs) is always compared exactly.
         /// </summary>
         private void CheckIsolation(RegionState state, QuoteRequest request, QuoteResult q, InvariantReport report, Action<string, string> fail)
         {
@@ -195,6 +205,7 @@ namespace Regions.Engine
                 if (q2 == null) continue;
                 if (MarketLayer(q2) != MarketLayer(q))
                     fail(GraphIsolation, $"boosting unreachable supplier {o.OriginCityId} changed the quote");
+                if (state.Manifest.Parameters.Scarcity != null) continue;
                 for (var i = 0; i < Math.Min(q.Offers.Count, q2.Offers.Count); i++)
                     if (q.Offers[i].Eligible && q2.Offers[i].Eligible
                         && q2.Offers[i].LandedPrice < q.Offers[i].LandedPrice - Tolerance(q.Offers[i].LandedPrice!.Value))
@@ -246,7 +257,9 @@ namespace Regions.Engine
             {
                 var before = q.Offers[i];
                 var after = q2.Offers[i];
-                if (before.OriginKind == OriginKind.City && OfferKey(before) != OfferKey(after))
+                // Customs never applies to domestic offers. Their scarcity premium may rise (a higher import price
+                // lifts the ceiling on scarce domestic supply: the textbook effect of protection), so it is not compared.
+                if (before.OriginKind == OriginKind.City && OfferKeyBeforeScarcity(before) != OfferKeyBeforeScarcity(after))
                     fail(TariffSpecificity, $"raising an import tariff changed domestic offer {i}");
                 if (before.OriginKind == OriginKind.World && before.Eligible && after.Eligible && after.LandedPrice < before.LandedPrice - Tolerance(before.LandedPrice!.Value))
                     fail(TariffSpecificity, $"raising an import tariff made world offer {i} cheaper");
@@ -270,7 +283,7 @@ namespace Regions.Engine
                 var before = q.Offers[i];
                 var after = q2.Offers[i];
                 var subsidised = before.Eligible && before.Subsidy > 0;
-                if (!subsidised && OfferKey(before) != OfferKey(after))
+                if (!subsidised && OfferKeyBeforeScarcity(before) != OfferKeyBeforeScarcity(after))
                     fail(SubsidySpecificity, $"removing a freight subsidy changed offer {i}, which received no subsidy");
                 if (subsidised && after.Eligible && after.LandedPrice < before.LandedPrice - Tolerance(before.LandedPrice!.Value))
                     fail(SubsidySpecificity, $"removing a freight subsidy made offer {i} cheaper");
@@ -285,7 +298,7 @@ namespace Regions.Engine
             {
                 SchemaVersion = m.SchemaVersion, RegionId = m.RegionId, Revision = m.Revision,
                 Cities = m.Cities, Links = m.Links, WorldGateways = m.WorldGateways,
-                Parameters = new ModelParameters { ModeCosts = p.ModeCosts, ResourcePrices = p.ResourcePrices, Staleness = p.Staleness, Policies = policies },
+                Parameters = new ModelParameters { ModeCosts = p.ModeCosts, ResourcePrices = p.ResourcePrices, Staleness = p.Staleness, Policies = policies, Scarcity = p.Scarcity },
             };
             return new RegionState(copy, s.LatestSnapshots, s.CurrentRegionSeq, s.Resources);
         }
@@ -335,12 +348,22 @@ namespace Regions.Engine
             string.Join("|", q.Offers.Select(OfferKey)) + "|selected=" + q.SelectedOfferIndex;
 
         /// <summary>Landed price before buyer/logistics support (log §17.4 step 5).</summary>
-        private static double PreSupport(Offer o) => o.LandedPrice!.Value + (o.Subsidy ?? 0);
+        /// <summary>
+        /// The route-and-customs layer: landed price before buyer/logistics support (log §17.4 step 5) and before the
+        /// scarcity premium (step 4). Scarcity and shared subsidy budgets are deliberate region-wide couplings, so the
+        /// isolation (#1) and route (#3) rules are checked on this layer, as log §18.4 #3 prescribes ("policies held fixed").
+        /// </summary>
+        private static double PreSupport(Offer o) => o.ProducerPrice!.Value + o.Freight!.Value + o.Tariff!.Value;
 
         /// <summary>The market layer only: everything except the budget-dependent subsidy and the selection it can move.</summary>
         private static string MarketLayer(QuoteResult q) => string.Join("|", q.Offers.Select(o => string.Join(",",
             o.OriginKind, o.OriginCityId, o.WorldGatewayEndpointKey, string.Join(">", o.Path), o.Eligible, o.ExcludedReason,
             F(o.ProducerPrice), F(o.Freight), F(o.Tariff), F(o.Eligible ? PreSupport(o) : (double?)null))));
+
+        /// <summary>Everything except the market-responsive scarcity premium (and the landed total it feeds).</summary>
+        private static string OfferKeyBeforeScarcity(Offer o) => string.Join(",",
+            o.OriginKind, o.OriginCityId, o.WorldGatewayEndpointKey, string.Join(">", o.Path), o.Eligible, o.ExcludedReason,
+            F(o.ProducerPrice), F(o.Freight), F(o.Tariff), F(o.Subsidy));
 
         private static string OfferKey(Offer o) => string.Join(",",
             o.OriginKind, o.OriginCityId, o.WorldGatewayEndpointKey, string.Join(">", o.Path), o.Eligible, o.ExcludedReason,

@@ -109,6 +109,21 @@
           "required": ["maxRegionSeqAge"],
           "properties": { "maxRegionSeqAge": { "type": ["integer", "null"], "minimum": 0 } }
         },
+        "scarcity": {
+          "description": "Optional (added within v1). null or absent = off. Supplier price rises when demand leaning on it exceeds its effective offer: premium = producerPrice x min(maxPremium, premiumSlope x max(0, load/offer - 1)).",
+          "anyOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["premiumSlope", "maxPremium"],
+              "properties": {
+                "premiumSlope": { "type": "number", "minimum": 0 },
+                "maxPremium": { "type": "number", "minimum": 0 }
+              }
+            }
+          ]
+        },
         "policies": {
           "description": "Optional (added within v1 by A7). Federal landed-cost levers (log §17.4, §17.10). Effects on prices are modeled; budgets and exposure are forecasts, never cash.",
           "type": "object",

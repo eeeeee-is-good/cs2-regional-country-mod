@@ -45,6 +45,9 @@ namespace Regions.Contracts
         public double? Freight { get; set; }
         public double? Tariff { get; set; }
         public double? Subsidy { get; set; }
+        /// <summary>Optional (added within v1). Supplier price rise from supply pressure; 0 when none, null when ineligible.
+        /// LandedPrice = ProducerPrice + ScarcityPremium + Freight + Tariff - Subsidy.</summary>
+        public double? ScarcityPremium { get; set; }
         public double? LandedPrice { get; set; }
         /// <summary>Supplier snapshot used (City offers only).</summary>
         public SnapshotRef? SupplierSnapshot { get; set; }

@@ -70,6 +70,11 @@ namespace Regions.Engine
             }
 
             ValidatePolicies(m, p);
+            if (m.Parameters.Scarcity is ScarcityRule sr)
+            {
+                if (!Num.IsFiniteNonNegative(sr.PremiumSlope)) p.Add("scarcity.premiumSlope must be finite and >= 0");
+                if (!Num.IsFiniteNonNegative(sr.MaxPremium)) p.Add("scarcity.maxPremium must be finite and >= 0");
+            }
 
             if (m.Parameters.Staleness.MaxRegionSeqAge < 0) p.Add("staleness.maxRegionSeqAge must be >= 0 or null");
             if (state.CurrentRegionSeq < 0) p.Add("currentRegionSeq must be >= 0");

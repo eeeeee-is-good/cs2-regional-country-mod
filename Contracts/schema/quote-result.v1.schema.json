@@ -27,6 +27,10 @@
           "freight": { "$ref": "common.v1.schema.json#/$defs/nonNegNumberOrNull" },
           "tariff": { "$ref": "common.v1.schema.json#/$defs/nonNegNumberOrNull" },
           "subsidy": { "$ref": "common.v1.schema.json#/$defs/nonNegNumberOrNull" },
+          "scarcityPremium": {
+            "description": "Optional (added within v1). Supplier price rise from supply pressure when the region's scarcity rule is on; 0 when none or for world offers; null when ineligible. landedPrice = producerPrice + scarcityPremium + freight + tariff - subsidy.",
+            "$ref": "common.v1.schema.json#/$defs/nonNegNumberOrNull"
+          },
           "landedPrice": { "$ref": "common.v1.schema.json#/$defs/nonNegNumberOrNull" },
           "supplierSnapshot": {
             "anyOf": [
