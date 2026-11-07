@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Regions Sandbox</title>
+<style>
+  :root {
+    --bg: #0d141c; --panel: #151f2b; --panel2: #1b2836; --line: #2a3a4c; --text: #e6edf3; --muted: #8b9bb0;
+    --accent: #4fd1c5; --good: #3ecf8e; --bad: #ff6b6b; --warn: #f5b84a;
+    --road: #a7b0bb; --rail: #f0a03c; --ship: #3fa7f5; --air: #b07cff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: .5px; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  header .spacer { flex: 1; }
+  select, input, button { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #062421; border-color: var(--accent); font-weight: 600; }
+  .badge { padding: 5px 10px; border-radius: 999px; font-weight: 600; font-size: 13px; cursor: pointer; border: 1px solid transparent; }
+  .badge.ok { background: rgba(62,207,142,.15); color: var(--good); border-color: rgba(62,207,142,.4); }
+  .badge.fail { background: rgba(255,107,107,.15); color: var(--bad); border-color: rgba(255,107,107,.4); }
+  .layout { display: grid; grid-template-columns: 1fr 400px; height: calc(100% - 56px); }
+  @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; height: auto; } }
+  .mapwrap { position: relative; overflow: hidden; background: radial-gradient(ellipse at 40% 35%, #18293a, #0b1219 75%); }
+  svg#map { width: 100%; height: 100%; display: block; user-select: none; }
+  .toolbar { position: absolute; top: 12px; left: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .toolbar button { background: rgba(21,31,43,.92); }
+  .toolbar button.active { background: var(--accent); color: #062421; border-color: var(--accent); font-weight: 600; }
+  .toolbar .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .hint { position: absolute; bottom: 44px; left: 12px; right: 12px; color: var(--muted); font-size: 13px; pointer-events: none; text-shadow: 0 1px 2px #000; }
+  .summary { position: absolute; bottom: 10px; left: 12px; right: 12px; display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; pointer-events: none; }
+  .summary span b { color: var(--accent); }
+  .errors { position: absolute; top: 56px; left: 12px; right: 12px; background: rgba(255,107,107,.12); border: 1px solid rgba(255,107,107,.5); color: #ffc9c9; border-radius: 8px; padding: 8px 12px; font-size: 13px; display: none; }
+  aside { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 12px 14px 40px; }
+  aside section { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+  aside h2 { font-size: 14px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); }
+  aside h3 { font-size: 16px; margin: 0 0 10px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; }
+  .field { display: grid; grid-template-columns: 1fr 120px; align-items: center; gap: 8px; margin: 6px 0; }
+  .field input, .field select { width: 100%; }
+  .check { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .danger { border-color: rgba(255,107,107,.5); color: #ffb3b3; }
+  .offer { border-top: 1px solid var(--line); padding: 8px 0; }
+  .offer:first-of-type { border-top: 0; }
+  .offer .top { display: flex; justify-content: space-between; gap: 8px; }
+  .offer .name { font-weight: 600; }
+  .offer .price { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .offer.win .name::before { content: "★ "; color: var(--warn); }
+  .offer.out { opacity: .6; }
+  .bar { display: flex; height: 10px; border-radius: 3px; overflow: hidden; margin: 6px 0 4px; background: #0e161f; }
+  .bar i { display: block; height: 100%; }
+  .legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  .reason { font-size: 12px; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  td, th { padding: 4px 4px; text-align: right; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  td:first-child, th:first-child { text-align: left; }
+  .slider { display: grid; grid-template-columns: 70px 1fr 54px; gap: 8px; align-items: center; margin: 6px 0; }
+  .slider input[type=range] { padding: 0; width: 100%; accent-color: var(--accent); }
+  .forecast-tag { display: inline-block; font-size: 10px; letter-spacing: .8px; padding: 2px 6px; border-radius: 4px; background: rgba(245,184,74,.15); color: var(--warn); margin-left: 6px; vertical-align: 2px; }
+  details summary { cursor: pointer; color: var(--muted); }
+  #violations { display: none; margin-top: 8px; font-size: 12px; color: #ffc9c9; }
+  .city-label { fill: var(--text); font-size: 15px; font-weight: 600; paint-order: stroke; stroke: #0b1219; stroke-width: 4px; }
+  .price-pill { font-size: 13px; font-weight: 700; }
+  .link-label { fill: var(--muted); font-size: 12px; paint-order: stroke; stroke: #0b1219; stroke-width: 3px; }
+  g.city { cursor: pointer; }
+  g.link { cursor: pointer; }
+  .cargo { pointer-events: none; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Regions Sandbox</h1>
+    <div class="sub">Steel prices across a region of cities, computed by the real engine · <span id="engine">engine</span> · modeled prices, never applied to a game</div>
+  </div>
+  <div class="spacer"></div>
+  <select id="scenario" title="Load an example region"></select>
+  <button id="export" title="Download this region as a file">Export</button>
+  <button id="import" title="Load a region file">Import</button>
+  <input id="importFile" type="file" accept=".json,application/json" hidden>
+  <span id="rules" class="badge ok" title="Click for details">Checking…</span>
+</header>
+<div class="layout">
+  <div class="mapwrap">
+    <svg id="map" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Region map: cities, transport links and steel prices"></svg>
+    <div class="toolbar" id="toolbar"></div>
+    <div class="errors" id="errors"></div>
+    <div class="hint" id="hint"></div>
+    <div class="summary" id="summary"></div>
+  </div>
+  <aside>
+    <section id="rulesPanel" style="display:none"><h2>Rule check</h2><div id="violations"></div></section>
+    <section id="editor"></section>
+    <section id="quote"></section>
+    <section>
+      <h2>Policies <span class="forecast-tag">FORECAST</span></h2>
+      <div id="policyControls"></div>
+      <div id="policyForecast" style="margin-top:10px"></div>
+    </section>
+    <section>
+      <details>
+        <summary>Prices and transport costs</summary>
+        <div id="settings" style="margin-top:8px"></div>
+      </details>
+    </section>
+    <section class="small muted">
+      Drag cities to move them. Links drawn with the map follow the map distance; type a distance to fix it.
+      Every number comes from the regional engine; nothing here touches Cities: Skylines II.
+    </section>
+  </aside>
+</div>
+
+<script>
+"use strict";
+const MODES = ["Road", "Rail", "Ship"];
+const MODE_COLOR = { Road: "var(--road)", Rail: "var(--rail)", Ship: "var(--ship)", Air: "var(--air)" };
+const MODE_HEX = { Road: "#a7b0bb", Rail: "#f0a03c", Ship: "#3fa7f5", Air: "#b07cff" };
+const REASONS = {
+  NoPath: "no route to this city",
+  ModeIncompatible: "routes exist, but not in a mode steel can use",
+  StaleSnapshot: "supplier data too old",
+  UnknownSupply: "supply unknown (figures not trusted or not measured)",
+  NoSupply: "no spare steel to offer",
+  NoWorldGateway: "world connection not usable",
+  UnknownResource: "steel has no price set",
+};
+const TOOLS = [
+  { id: "move", key: "V", label: "Move / select", hint: "Click a city to see its steel price and edit it. Drag cities to move them. Click a link to edit it." },
+  { id: "city", key: "C", label: "+ City", hint: "Click empty space on the map to place a new city." },
+  { id: "Road", key: "R", label: "Road", mode: true, hint: "Click a city, then another, to build a road between them." },
+  { id: "Rail", key: "T", label: "Rail", mode: true, hint: "Click a city, then another, to build a railway between them." },
+  { id: "Ship", key: "S", label: "Ship", mode: true, hint: "Click a city, then another, to open a shipping route between them." },
+  { id: "delete", key: "X", label: "Delete", hint: "Click a city or a link to remove it." },
+];
+const STORAGE_KEY = "regions-sandbox-model-v1";
+
+let model = null;
+let analysis = null;
+let selected = null;          // { kind: "city" | "link", id }
+let tool = "move";
+let linkFrom = null;          // city id while drawing a link
+let drag = null;              // { id, dx, dy, moved }
+let requestSeq = 0;
+let cargoAnim = null;
+
+const $ = id => document.getElementById(id);
+const svg = $("map");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = (n, d = 2) => n == null || isNaN(n) ? "–" : (Math.abs(n) >= 1e6 ? n.toExponential(2) : n.toFixed(d));
+const city = id => model.cities.find(c => c.id === id);
+const link = id => model.links.find(l => l.id === id);
+const cityName = id => city(id)?.name || id;
+const mapKm = (a, b) => Math.round(Math.hypot(a.x - b.x, a.y - b.y));
+
+function nextId(prefix, list) {
+  let n = 0;
+  for (const x of list) { const m = /-(\d+)$/.exec(x.id); if (m) n = Math.max(n, +m[1]); }
+  return `${prefix}-${n + 1}`;
+}
+
+// ---------- persistence ----------
+function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(model)); } catch { /* storage unavailable */ } }
+function loadSaved() { try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : null; } catch { return null; } }
+
+// ---------- server ----------
+async function api(path, body) {
+  const res = await fetch(path, body === undefined ? {} : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  if (!res.ok) throw new Error(`${path}: ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+async function analyze() {
+  const seq = ++requestSeq;
+  try {
+    const a = await api("/api/analyze", model);
+    if (seq !== requestSeq) return;
+    analysis = a;
+  } catch (e) {
+    if (seq !== requestSeq) return;
+    analysis = { errors: [String(e.message || e)], cities: {}, policies: [], violations: [], rulesPassed: false, quotesChecked: 0 };
+  }
+  save();
+  renderMap();
+  renderResults();
+}
+
+let analyzeTimer = 0;
+function changed() {
+  renderMap();
+  clearTimeout(analyzeTimer);
+  analyzeTimer = setTimeout(analyze, 120);
+}
+
+function setModel(m) {
+  model = m;
+  for (const mode of MODES) if (!model.subsidies.some(s => s.mode === mode)) model.subsidies.push({ mode, percent: 0, budget: 5000 });
+  selected = null; linkFrom = null;
+  renderEditor(); renderPolicyControls(); renderSettings();
+  changed();
+}
+
+// ---------- map ----------
+function quoteFor(id) { return analysis?.cities?.[id]?.quote || null; }
+function bestOffer(id) { const q = quoteFor(id); return q && q.selectedOfferIndex != null ? q.offers[q.selectedOfferIndex] : null; }
+
+function worldAnchor(c) {
+  const d = [{ x: 0, y: c.y, d: c.x }, { x: 1000, y: c.y, d: 1000 - c.x }, { x: c.x, y: 0, d: c.y }, { x: c.x, y: 700, d: 700 - c.y }];
+  d.sort((a, b) => a.d - b.d);
+  return { x: Math.min(985, Math.max(15, d[0].x)), y: Math.min(685, Math.max(15, d[0].y)) };
+}
+
+function priceColor(p, min, max) {
+  if (p == null) return "#3a4757";
+  const t = max > min ? (p - min) / (max - min) : 0;
+  return `hsl(${Math.round(140 - 140 * t)}, 65%, 48%)`;
+}
+
+function routePoints(destId) {
+  const offer = bestOffer(destId);
+  const dest = city(destId);
+  if (!offer || !dest) return null;
+  if (offer.originKind === "World") { const a = worldAnchor(dest); return { pts: [a, dest], world: true }; }
+  let at = offer.originCityId;
+  const pts = [city(at)];
+  for (const id of offer.path) {
+    const l = link(id); if (!l) return null;
+    at = l.a === at ? l.b : l.a;
+    pts.push(city(at));
+  }
+  return pts.every(Boolean) ? { pts, world: false, links: offer.path } : null;
+}
+
+function hasSurplus(c) { return !!(c.steel && c.steel.output != null && c.steel.output > 0 && (c.steel.inputUse == null || c.steel.output > c.steel.inputUse)); }
+
+function renderMap() {
+  if (!model) return;
+  // Colour scale: green at the regional producer price (steel made next door), red at the world price or above.
+  const prices = model.cities.filter(c => !hasSurplus(c)).map(c => bestOffer(c.id)?.landedPrice).filter(p => p != null);
+  const min = model.regionalPrice, max = Math.max(model.worldPrice, ...prices);
+  const dest = selected?.kind === "city" ? selected.id : null;
+  const route = dest ? routePoints(dest) : null;
+  const routeLinks = new Set(route?.links || []);
+  let s = "";
+
+  s += `<defs>`;
+  for (const m of Object.keys(MODE_HEX))
+    s += `<marker id="arrow-${m}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${MODE_HEX[m]}"/></marker>`;
+  s += `<filter id="glow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
+
+  // grid, 100 km squares
+  for (let x = 100; x < 1000; x += 100) s += `<line x1="${x}" y1="0" x2="${x}" y2="700" stroke="#ffffff" stroke-opacity=".04"/>`;
+  for (let y = 100; y < 700; y += 100) s += `<line x1="0" y1="${y}" x2="1000" y2="${y}" stroke="#ffffff" stroke-opacity=".04"/>`;
+  s += `<text x="990" y="690" text-anchor="end" fill="#5d6f84" font-size="11">grid: 100 km</text>`;
+
+  // world connections
+  for (const c of model.cities.filter(c => c.worldGatewayKm != null)) {
+    const a = worldAnchor(c);
+    const hot = route?.world && dest === c.id;
+    s += `<line x1="${c.x}" y1="${c.y}" x2="${a.x}" y2="${a.y}" stroke="${hot ? "#4fd1c5" : "#5d6f84"}" stroke-width="${hot ? 5 : 2}" stroke-dasharray="6 6" ${hot ? 'filter="url(#glow)"' : ""}/>`;
+    s += `<circle cx="${a.x}" cy="${a.y}" r="13" fill="#0f2233" stroke="#4fd1c5" stroke-width="1.5"/><text x="${a.x}" y="${a.y + 5}" text-anchor="middle" font-size="14">🌐</text>`;
+    s += `<text class="link-label" x="${(c.x + a.x) / 2}" y="${(c.y + a.y) / 2 - 6}" text-anchor="middle">World ${fmt(c.worldGatewayKm, 0)} km</text>`;
+  }
+
+  // links, with parallel links between the same pair spread apart
+  const groups = {};
+  for (const l of model.links) { const k = [l.a, l.b].sort().join("|"); (groups[k] ||= []).push(l); }
+  for (const list of Object.values(groups)) list.forEach((l, i) => {
+    const a = city(l.a), b = city(l.b); if (!a || !b) return;
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const off = (i - (list.length - 1) / 2) * 16;
+    const nx = -(b.y - a.y) / len * off, ny = (b.x - a.x) / len * off;
+    const sel = selected?.kind === "link" && selected.id === l.id;
+    const hot = routeLinks.has(l.id);
+    // stop one-way arrows at the city edge
+    const ex = b.x - (b.x - a.x) / len * 24, ey = b.y - (b.y - a.y) / len * 24;
+    const x2 = l.oneWay ? ex : b.x, y2 = l.oneWay ? ey : b.y;
+    s += `<g class="link" data-link="${esc(l.id)}">`;
+    s += `<line x1="${a.x + nx}" y1="${a.y + ny}" x2="${x2 + nx}" y2="${y2 + ny}" stroke="transparent" stroke-width="16"/>`;
+    if (hot) s += `<line x1="${a.x + nx}" y1="${a.y + ny}" x2="${x2 + nx}" y2="${y2 + ny}" stroke="#4fd1c5" stroke-width="10" stroke-opacity=".35" filter="url(#glow)"/>`;
+    s += `<line x1="${a.x + nx}" y1="${a.y + ny}" x2="${x2 + nx}" y2="${y2 + ny}" stroke="${MODE_HEX[l.mode]}" stroke-width="${sel ? 6 : 4}" ${l.broken ? 'stroke-dasharray="4 7" stroke-opacity=".5"' : ""} ${l.oneWay ? `marker-end="url(#arrow-${l.mode})"` : ""} stroke-linecap="round"/>`;
+    if (sel) s += `<line x1="${a.x + nx}" y1="${a.y + ny}" x2="${x2 + nx}" y2="${y2 + ny}" stroke="#fff" stroke-width="1.5" stroke-dasharray="3 5"/>`;
+    s += `<text class="link-label" x="${(a.x + b.x) / 2 + nx * 2.2}" y="${(a.y + b.y) / 2 + ny * 2.2 + (off < 0 ? -6 : off > 0 ? 14 : -7)}" text-anchor="middle">${l.mode} ${fmt(l.distanceKm, 0)} km${l.broken ? " (broken)" : ""}</text>`;
+    s += `</g>`;
+  });
+
+  // pending link
+  if (linkFrom && city(linkFrom)) {
+    const c = city(linkFrom);
+    s += `<circle cx="${c.x}" cy="${c.y}" r="30" fill="none" stroke="${MODE_HEX[tool] || "#fff"}" stroke-width="3" stroke-dasharray="5 5"/>`;
+  }
+
+  // cities
+  for (const c of model.cities) {
+    const surplus = hasSurplus(c);
+    // A city with its own spare steel does not need to import it: show that rather than an import price.
+    const p = surplus ? null : bestOffer(c.id)?.landedPrice;
+    const color = priceColor(p, min, max);
+    const sel = dest === c.id;
+    s += `<g class="city" data-city="${esc(c.id)}" transform="translate(${c.x},${c.y})">`;
+    if (sel) s += `<circle r="31" fill="none" stroke="#4fd1c5" stroke-width="3" filter="url(#glow)"/>`;
+    s += `<circle r="22" fill="${color}" stroke="${sel ? "#fff" : "#0b1219"}" stroke-width="3"/>`;
+    s += `<text y="6" text-anchor="middle" font-size="17">${surplus ? "🏭" : "🏙️"}</text>`;
+    s += `<text class="city-label" y="-32" text-anchor="middle">${esc(c.name)}</text>`;
+    // A producing city does not import from itself: show that it makes steel instead of a price.
+    const label = p != null ? fmt(p, 2) : surplus ? "makes steel" : "no supply";
+    const pillFill = p != null ? color : surplus ? "#1d5c58" : "#2a3a4c";
+    const w = label.length * 7.5 + 16;
+    s += `<rect x="${-w / 2}" y="28" width="${w}" height="20" rx="10" fill="${pillFill}" stroke="#0b1219" stroke-width="2"/>`;
+    s += `<text class="price-pill" y="43" text-anchor="middle" fill="${p == null ? "#d6f5f2" : "#06120d"}">${label}</text>`;
+    s += `</g>`;
+  }
+
+  svg.innerHTML = s;
+  startCargo(route);
+}
+
+function startCargo(route) {
+  if (cargoAnim) cancelAnimationFrame(cargoAnim);
+  cargoAnim = null;
+  if (!route || route.pts.length < 2) return;
+  const pts = route.pts;
+  const segs = [];
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y); segs.push(d); total += d; }
+  if (total < 1) return;
+  const ns = "http://www.w3.org/2000/svg";
+  const dots = [0, 1, 2, 3].map(() => {
+    const el = document.createElementNS(ns, "circle");
+    el.setAttribute("r", "5"); el.setAttribute("class", "cargo");
+    el.setAttribute("fill", route.world ? "#4fd1c5" : "#ffe08a"); el.setAttribute("stroke", "#0b1219"); el.setAttribute("stroke-width", "1.5");
+    svg.appendChild(el); return el;
+  });
+  const start = performance.now();
+  const speed = 120; // map km per second, a visual effect only
+  const step = now => {
+    const t0 = ((now - start) / 1000 * speed) % total;
+    dots.forEach((el, k) => {
+      let d = (t0 + k * total / dots.length) % total, i = 0;
+      while (i < segs.length - 1 && d > segs[i]) { d -= segs[i]; i++; }
+      const f = segs[i] ? d / segs[i] : 0;
+      el.setAttribute("cx", pts[i].x + (pts[i + 1].x - pts[i].x) * f);
+      el.setAttribute("cy", pts[i].y + (pts[i + 1].y - pts[i].y) * f);
+    });
+    cargoAnim = requestAnimationFrame(step);
+  };
+  cargoAnim = requestAnimationFrame(step);
+}
+
+function svgPoint(evt) {
+  const pt = svg.createSVGPoint(); pt.x = evt.clientX; pt.y = evt.clientY;
+  const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+  return { x: Math.max(20, Math.min(980, Math.round(p.x))), y: Math.max(20, Math.min(680, Math.round(p.y))) };
+}
+
+svg.addEventListener("pointerdown", evt => {
+  const cityEl = evt.target.closest("g.city");
+  const linkEl = evt.target.closest("g.link");
+  const p = svgPoint(evt);
+
+  if (tool === "city") {
+    if (cityEl || linkEl) return;
+    const id = nextId("city", model.cities);
+    model.cities.push({ id, name: `City ${id.split("-")[1]}`, x: p.x, y: p.y, steel: null, worldGatewayKm: null });
+    select({ kind: "city", id }); changed(); return;
+  }
+  if (tool === "delete") {
+    if (cityEl) {
+      const id = cityEl.dataset.city;
+      model.cities = model.cities.filter(c => c.id !== id);
+      model.links = model.links.filter(l => l.a !== id && l.b !== id);
+    } else if (linkEl) {
+      model.links = model.links.filter(l => l.id !== linkEl.dataset.link);
+    } else return;
+    select(null); changed(); return;
+  }
+  if (MODES.includes(tool)) {
+    if (!cityEl) { linkFrom = null; renderMap(); return; }
+    const id = cityEl.dataset.city;
+    if (!linkFrom) { linkFrom = id; renderMap(); return; }
+    if (linkFrom === id) { linkFrom = null; renderMap(); return; }
+    const a = city(linkFrom), b = city(id);
+    const newId = nextId("link", model.links);
+    model.links.push({ id: newId, a: a.id, b: b.id, mode: tool, distanceKm: mapKm(a, b), autoDistance: true, oneWay: false, broken: false });
+    linkFrom = null;
+    select({ kind: "link", id: newId }); changed(); return;
+  }
+  // move / select
+  if (cityEl) {
+    const c = city(cityEl.dataset.city);
+    drag = { id: c.id, dx: c.x - p.x, dy: c.y - p.y, moved: false };
+    svg.setPointerCapture(evt.pointerId);
+    select({ kind: "city", id: c.id });
+  } else if (linkEl) {
+    select({ kind: "link", id: linkEl.dataset.link });
+  } else {
+    select(null);
+  }
+});
+
+svg.addEventListener("pointermove", evt => {
+  if (!drag) return;
+  const p = svgPoint(evt), c = city(drag.id);
+  c.x = p.x + drag.dx; c.y = p.y + drag.dy; drag.moved = true;
+  for (const l of model.links) if (l.autoDistance && (l.a === c.id || l.b === c.id)) l.distanceKm = mapKm(city(l.a), city(l.b));
+  renderMap();
+});
+
+svg.addEventListener("pointerup", () => {
+  if (drag?.moved) { changed(); if (selected?.kind === "link" || selected?.kind === "city") renderEditor(); }
+  drag = null;
+});
+
+function select(sel) { selected = sel; renderEditor(); renderMap(); renderResults(); }
+
+// ---------- toolbar ----------
+function renderToolbar() {
+  $("toolbar").innerHTML = TOOLS.map(t =>
+    `<button data-tool="${t.id}" class="${tool === t.id ? "active" : ""}" title="${t.label} (shortcut ${t.key})" aria-label="${t.label}" aria-pressed="${tool === t.id}">${t.mode ? `<span class="sw" style="background:${MODE_HEX[t.id]}"></span>` : ""}${t.label}</button>`).join("");
+  $("hint").textContent = TOOLS.find(t => t.id === tool).hint + (linkFrom ? ` From ${cityName(linkFrom)} to…` : "");
+}
+$("toolbar").addEventListener("click", e => { const b = e.target.closest("button"); if (b) setTool(b.dataset.tool); });
+function setTool(t) { tool = t; linkFrom = null; renderToolbar(); renderMap(); }
+
+document.addEventListener("keydown", e => {
+  if (e.target.matches("input, select, textarea")) return;
+  const t = TOOLS.find(t => t.key.toLowerCase() === e.key.toLowerCase());
+  if (t) { setTool(t.id); return; }
+  if (e.key === "Escape") { linkFrom = null; setTool("move"); }
+  if ((e.key === "Delete" || e.key === "Backspace") && selected) {
+    if (selected.kind === "city") { model.cities = model.cities.filter(c => c.id !== selected.id); model.links = model.links.filter(l => l.a !== selected.id && l.b !== selected.id); }
+    else model.links = model.links.filter(l => l.id !== selected.id);
+    select(null); changed();
+  }
+});
+
+// ---------- editor (rendered only when the selection changes, so typing keeps focus) ----------
+function numOrNull(v) { return v === "" || v == null ? null : Number(v); }
+
+function renderEditor() {
+  const el = $("editor");
+  if (!model) return;
+  if (!selected) {
+    el.innerHTML = `<h2>Selection</h2><p class="muted">Nothing selected. Click a city to see what steel costs there, or pick a tool above the map to build.</p>`;
+    return;
+  }
+  if (selected.kind === "city") {
+    const c = city(selected.id); if (!c) { selected = null; renderEditor(); return; }
+    const st = c.steel;
+    el.innerHTML = `<h2>City</h2>
+      <div class="field"><span>Name</span><input data-f="name" value="${esc(c.name)}"></div>
+      <label class="check"><input type="checkbox" data-f="hasSteel" ${st ? "checked" : ""}> Reports steel (production and use)</label>
+      ${st ? `
+        <div class="field"><span>Output per day</span><input type="number" min="0" data-f="output" value="${st.output ?? ""}" placeholder="unknown"></div>
+        <div class="field"><span>Used locally per day</span><input type="number" min="0" data-f="inputUse" value="${st.inputUse ?? ""}" placeholder="unknown"></div>
+        <div class="field"><span>Capacity per day</span><input type="number" min="0" data-f="capacity" value="${st.capacity ?? ""}" placeholder="unknown"></div>
+        <div class="field"><span>How sure are the figures?</span><select data-f="confidence">
+          ${["Validated", "Provisional", "Unknown"].map(v => `<option ${st.confidence === v ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+        <div class="small muted">Leave a box empty if it is unknown. Unknown is never treated as zero.</div>` : ""}
+      <label class="check"><input type="checkbox" data-f="hasWorld" ${c.worldGatewayKm != null ? "checked" : ""}> Connected to the world market</label>
+      ${c.worldGatewayKm != null ? `<div class="field"><span>Distance to the world (km)</span><input type="number" min="0" data-f="worldKm" value="${c.worldGatewayKm}"></div>` : ""}
+      <div class="row"><button class="danger" data-action="delete">Delete city</button></div>`;
+  } else {
+    const l = link(selected.id); if (!l) { selected = null; renderEditor(); return; }
+    el.innerHTML = `<h2>Link</h2>
+      <h3>${esc(cityName(l.a))} ${l.oneWay ? "→" : "↔"} ${esc(cityName(l.b))}</h3>
+      <div class="field"><span>Transport</span><select data-f="mode">${MODES.map(m => `<option ${l.mode === m ? "selected" : ""}>${m}</option>`).join("")}</select></div>
+      <div class="field"><span>Distance (km)</span><input type="number" min="0" data-f="distanceKm" value="${l.distanceKm}"></div>
+      <label class="check"><input type="checkbox" data-f="autoDistance" ${l.autoDistance ? "checked" : ""}> Follow the map distance</label>
+      <label class="check"><input type="checkbox" data-f="oneWay" ${l.oneWay ? "checked" : ""}> One way (${esc(cityName(l.a))} → ${esc(cityName(l.b))})</label>
+      <label class="check"><input type="checkbox" data-f="broken" ${l.broken ? "checked" : ""}> Broken (closed)</label>
+      <div class="row"><button data-action="reverse">Reverse direction</button><button class="danger" data-action="delete">Delete link</button></div>`;
+  }
+}
+
+$("editor").addEventListener("input", e => {
+  const f = e.target.dataset.f; if (!f || !selected) return;
+  if (selected.kind === "city") {
+    const c = city(selected.id);
+    if (f === "name") c.name = e.target.value;
+    else if (f === "hasSteel") { c.steel = e.target.checked ? { output: 0, inputUse: 0, capacity: null, confidence: "Validated" } : null; renderEditor(); }
+    else if (f === "hasWorld") { c.worldGatewayKm = e.target.checked ? 100 : null; renderEditor(); }
+    else if (f === "worldKm") c.worldGatewayKm = numOrNull(e.target.value) ?? 0;
+    else if (f === "confidence") c.steel.confidence = e.target.value;
+    else c.steel[f] = numOrNull(e.target.value);
+  } else {
+    const l = link(selected.id);
+    if (f === "mode") l.mode = e.target.value;
+    else if (f === "distanceKm") { l.distanceKm = numOrNull(e.target.value) ?? 0; l.autoDistance = false; const cb = $("editor").querySelector('[data-f="autoDistance"]'); if (cb) cb.checked = false; }
+    else if (f === "autoDistance") { l.autoDistance = e.target.checked; if (l.autoDistance) { l.distanceKm = mapKm(city(l.a), city(l.b)); renderEditor(); } }
+    else l[f] = e.target.checked;
+    if (f === "oneWay") renderEditor();
+  }
+  changed();
+});
+
+$("editor").addEventListener("click", e => {
+  const a = e.target.dataset.action; if (!a || !selected) return;
+  if (a === "delete") {
+    if (selected.kind === "city") { model.cities = model.cities.filter(c => c.id !== selected.id); model.links = model.links.filter(l => l.a !== selected.id && l.b !== selected.id); }
+    else model.links = model.links.filter(l => l.id !== selected.id);
+    select(null); changed();
+  } else if (a === "reverse") {
+    const l = link(selected.id); [l.a, l.b] = [l.b, l.a]; renderEditor(); changed();
+  }
+});
+
+// ---------- results (rendered after every analysis) ----------
+function routeText(offer) {
+  if (offer.originKind === "World") return "World market by road";
+  if (!offer.path.length) return "";
+  return offer.path.map(id => { const l = link(id); return l ? `${l.mode} ${fmt(l.distanceKm, 0)} km` : id; }).join(" › ");
+}
+
+function renderResults() {
+  if (!model) return;
+  $("engine").textContent = analysis?.engineVersion ? `engine ${analysis.engineVersion}` : "engine";
+
+  // errors
+  const errs = analysis?.errors || [];
+  $("errors").style.display = errs.length ? "block" : "none";
+  $("errors").innerHTML = errs.length ? `<b>Fix these first:</b><br>${errs.map(esc).join("<br>")}` : "";
+
+  // rules badge
+  const badge = $("rules");
+  if (!analysis || errs.length) { badge.className = "badge fail"; badge.textContent = errs.length ? "Invalid input" : "Checking…"; }
+  else if (analysis.rulesPassed) { badge.className = "badge ok"; badge.textContent = `✓ All rules hold (${analysis.quotesChecked} quotes)`; }
+  else { badge.className = "badge fail"; badge.textContent = `✗ ${analysis.violations.length} rule violation(s)`; }
+  $("violations").innerHTML = (analysis?.violations || []).map(esc).join("<br>") || "<span class='muted'>The engine's quotes pass every rule the checker knows: no phantom trade, valid routes, adding routes never raises prices, customs only on foreign steel, subsidies only where they apply, no impossible numbers, every quote labelled as an estimate.</span>";
+
+  // summary
+  const counts = { regional: 0, world: 0, own: 0, none: 0 };
+  for (const c of model.cities) {
+    const o = bestOffer(c.id);
+    if (hasSurplus(c)) counts.own++;
+    else if (o) o.originKind === "World" ? counts.world++ : counts.regional++;
+    else counts.none++;
+  }
+  $("summary").innerHTML = `<span><b>${model.cities.length}</b> cities</span><span><b>${model.links.length}</b> links</span>
+    <span><b>${counts.own}</b> make their own steel</span><span><b>${counts.regional}</b> buy from the region</span><span><b>${counts.world}</b> import from the world</span><span><b>${counts.none}</b> have no supply</span>`;
+
+  // quote panel
+  const q = selected?.kind === "city" ? quoteFor(selected.id) : null;
+  const el = $("quote");
+  if (!selected || selected.kind !== "city") {
+    el.innerHTML = `<h2>Steel price</h2><p class="muted">Select a city to see where its steel would come from and why.</p>`;
+  } else if (!q) {
+    el.innerHTML = `<h2>Steel price</h2><p class="muted">No result yet.</p>`;
+  } else {
+    const me = analysis.cities[selected.id];
+    const maxLanded = Math.max(1, ...q.offers.filter(o => o.eligible).map(o => o.landedPrice + o.subsidy));
+    const win = q.selectedOfferIndex != null ? q.offers[q.selectedOfferIndex] : null;
+    let h = `<h2>Steel price</h2><h3>Steel delivered to ${esc(cityName(q.destCityId))}</h3>`;
+    h += win
+      ? `<p>Cheapest: <b>${esc(win.originKind === "World" ? "the world market" : cityName(win.originCityId))}</b> at <b>${fmt(win.landedPrice)}</b></p>`
+      : `<p class="muted">No offer can reach this city. It has no regional route to a supplier with spare steel, and no usable world connection.</p>`;
+    if (!q.offers.length) h += `<p class="muted small">No other city reports steel, and this city has no world connection.</p>`;
+    q.offers.forEach((o, i) => {
+      const name = o.originKind === "World" ? "World market" : cityName(o.originCityId);
+      const notes = o.originKind === "City" ? (analysis.cities[o.originCityId]?.supplyNotes || []) : [];
+      h += `<div class="offer ${i === q.selectedOfferIndex ? "win" : ""} ${o.eligible ? "" : "out"}">
+        <div class="top"><span class="name">${esc(name)}</span><span class="price">${o.eligible ? fmt(o.landedPrice) : "–"}</span></div>`;
+      if (o.eligible) {
+        const pct = v => `${Math.max(0, v) / maxLanded * 100}%`;
+        h += `<div class="bar"><i style="width:${pct(o.producerPrice - 0)};background:#6c7a8c"></i><i style="width:${pct(o.freight - o.subsidy)};background:#3fa7f5"></i><i style="width:${pct(o.subsidy)};background:repeating-linear-gradient(45deg,#3ecf8e 0 4px,transparent 4px 7px)"></i><i style="width:${pct(o.tariff)};background:#ff6b6b"></i></div>
+          <div class="reason">${esc(routeText(o))} · producer ${fmt(o.producerPrice)} + freight ${fmt(o.freight)}${o.tariff ? ` + customs ${fmt(o.tariff)}` : ""}${o.subsidy ? ` − subsidy ${fmt(o.subsidy)}` : ""}${o.effectiveRegionalOfferPerGameDay != null ? ` · offers ${fmt(o.effectiveRegionalOfferPerGameDay, 0)}/day` : ""}</div>`;
+      } else {
+        h += `<div class="reason">Excluded: ${esc(REASONS[o.excludedReason] || o.excludedReason)}${o.effectiveRegionalOfferPerGameDay != null ? ` (${fmt(o.effectiveRegionalOfferPerGameDay, 0)}/day)` : ""}</div>`;
+      }
+      if (notes.length) h += `<div class="reason">Data: ${esc(notes.join(", "))}</div>`;
+      h += `</div>`;
+    });
+    h += `<div class="legend" style="margin-top:8px"><span><i style="background:#6c7a8c"></i>producer price</span><span><i style="background:#3fa7f5"></i>freight</span><span><i style="background:#3ecf8e"></i>subsidy</span><span><i style="background:#ff6b6b"></i>customs</span></div>`;
+    if (me?.supplyNotes || me?.effectiveOffer != null || me?.supplyExcluded) {
+      h += `<p class="small muted" style="margin-top:10px">As a supplier: ${me.supplyExcluded ? esc(REASONS[me.supplyExcluded] || me.supplyExcluded) : `offers ${fmt(me.effectiveOffer, 0)} per day to other cities`}${me.supplyNotes?.length ? ` (${esc(me.supplyNotes.join(", "))})` : ""}.</p>`;
+    }
+    h += `<p class="small muted">Trace ${esc(q.provenance.traceId)} · modeled price quote, not a physical trade · applied to game: ${q.appliedToGame ? "yes" : "no"}</p>`;
+    el.innerHTML = h;
+  }
+
+  // policy forecast
+  const pf = analysis?.policies || [];
+  $("policyForecast").innerHTML = pf.length
+    ? `<table><tr><th>Policy</th><th>Exposure</th><th>Budget</th><th>Scale</th><th>Spend</th></tr>${pf.map(p =>
+        `<tr><td>${esc(p.policyId)}</td><td>${fmt(p.exposurePerGameDay, 0)}</td><td>${fmt(p.budgetPerGameDay, 0)}</td><td>${p.scale == null ? "–" : fmt(p.scale, 2)}</td><td>${fmt(p.forecastSpendPerGameDay, 0)}</td></tr>`).join("")}</table>
+       <div class="small muted" style="margin-top:6px">${pf.map(p => `${esc(p.policyId)}: ${esc(p.note)}`).join("<br>")}</div>`
+    : `<div class="small muted">No active policies. Move a slider to add one.</div>`;
+}
+
+$("rules").addEventListener("click", () => {
+  const p = $("rulesPanel"), v = $("violations");
+  const show = p.style.display === "none";
+  p.style.display = show ? "block" : "none"; v.style.display = show ? "block" : "none";
+});
+
+// ---------- policies and settings (rendered on load) ----------
+function renderPolicyControls() {
+  const sub = m => model.subsidies.find(s => s.mode === m);
+  $("policyControls").innerHTML = `
+    <div class="small muted">Import tariff on world steel (customs). Never charged on trade between your cities.</div>
+    <div class="slider"><span>Tariff</span><input type="range" min="0" max="100" step="1" data-p="tariff" aria-label="Import tariff percent" value="${model.tariffPercent}"><span data-v="tariff">${model.tariffPercent}%</span></div>
+    <div class="small muted" style="margin-top:10px">Freight subsidies: the state pays a share of the freight on that transport mode, within a daily budget.</div>
+    ${MODES.map(m => `<div class="slider"><span><span class="sw" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${MODE_HEX[m]}"></span> ${m}</span>
+      <input type="range" min="0" max="100" step="5" data-p="sub-${m}" aria-label="${m} freight subsidy percent" value="${sub(m).percent}"><span data-v="sub-${m}">${sub(m).percent}%</span></div>
+      <div class="field" style="margin-top:0"><span class="small muted">${m} budget per day</span><input type="number" min="0" step="100" data-p="budget-${m}" aria-label="${m} subsidy budget per day" value="${sub(m).budget}"></div>`).join("")}`;
+}
+
+$("policyControls").addEventListener("input", e => {
+  const p = e.target.dataset.p; if (!p) return;
+  const v = Number(e.target.value) || 0;
+  if (p === "tariff") model.tariffPercent = v;
+  else if (p.startsWith("sub-")) model.subsidies.find(s => s.mode === p.slice(4)).percent = v;
+  else if (p.startsWith("budget-")) model.subsidies.find(s => s.mode === p.slice(7)).budget = Math.max(0, v);
+  const label = $("policyControls").querySelector(`[data-v="${p}"]`); if (label) label.textContent = `${v}%`;
+  changed();
+});
+
+function renderSettings() {
+  const cost = m => model.costs.find(c => c.mode === m);
+  $("settings").innerHTML = `
+    <div class="field"><span>Regional steel producer price</span><input type="number" min="0" data-s="regionalPrice" value="${model.regionalPrice}"></div>
+    <div class="field"><span>World steel price</span><input type="number" min="0" data-s="worldPrice" value="${model.worldPrice}"></div>
+    <table style="margin-top:8px"><tr><th>Mode</th><th>Fixed cost</th><th>Cost per km</th></tr>
+    ${MODES.map(m => `<tr><td>${m}</td><td><input type="number" min="0" step="1" data-s="fixed-${m}" value="${cost(m)?.fixed ?? 0}" style="width:80px"></td>
+      <td><input type="number" min="0" step="0.01" data-s="perKm-${m}" value="${cost(m)?.perKm ?? 0}" style="width:80px"></td></tr>`).join("")}</table>
+    <div class="small muted" style="margin-top:6px">Freight on a link = fixed cost + cost per km × distance. These are model inputs, not game values.</div>`;
+}
+
+$("settings").addEventListener("input", e => {
+  const s = e.target.dataset.s; if (!s) return;
+  const v = Number(e.target.value);
+  if (s === "regionalPrice" || s === "worldPrice") model[s] = v;
+  else {
+    const [field, mode] = s.split("-");
+    let c = model.costs.find(c => c.mode === mode);
+    if (!c) { c = { mode, fixed: 0, perKm: 0 }; model.costs.push(c); }
+    c[field] = v;
+  }
+  changed();
+});
+
+// ---------- header ----------
+async function loadScenario(name) { setModel(name === "__empty" ? await api("/api/empty") : await api(`/api/scenarios/${encodeURIComponent(name)}`)); }
+
+$("scenario").addEventListener("change", async e => {
+  const v = e.target.value; e.target.value = "";
+  if (v) await loadScenario(v);
+});
+
+$("export").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(model, null, 2)], { type: "application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "region-sandbox.json"; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$("import").addEventListener("click", () => $("importFile").click());
+$("importFile").addEventListener("change", async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { setModel(JSON.parse(await f.text())); } catch (err) { alert("Could not read that file: " + err.message); }
+  e.target.value = "";
+});
+
+async function init() {
+  renderToolbar();
+  const scenarios = await api("/api/scenarios");
+  $("scenario").innerHTML = `<option value="">Load an example…</option><option value="__empty">Empty map</option>` +
+    scenarios.map(s => `<option value="${esc(s.name)}" title="${esc(s.description)}">${esc(s.name)}: ${esc(s.description.slice(0, 60))}${s.description.length > 60 ? "…" : ""}</option>`).join("");
+  const saved = loadSaved();
+  if (saved?.cities) setModel(saved); else await loadScenario("corridor");
+}
+init().catch(e => { $("errors").style.display = "block"; $("errors").textContent = "Could not reach the sandbox server: " + e.message; });
+</script>
+</body>
+</html>

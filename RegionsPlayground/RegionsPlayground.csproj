@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    Regions Sandbox: a local, browser-based region builder around the real engine (ARCHITECTURE.md "RegionalUI",
+    map spec M0 standalone atlas). Engine side only: no game references. Listens on localhost only.
+    Run it with "dotnet run" in this folder (see README.md), then open http://localhost:5280
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Regions.Playground</RootNamespace>
+    <AssemblyName>Regions.Playground</AssemblyName>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Contracts\Contracts.csproj" />
+    <ProjectReference Include="..\RegionalEngine\RegionalEngine.csproj" />
+    <ProjectReference Include="..\CitySimulator\CitySimulator.csproj" />
+  </ItemGroup>
+
+</Project>

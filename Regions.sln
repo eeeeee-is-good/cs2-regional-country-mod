@@ -23,6 +23,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RegionStore", "RegionStore\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RegionStore.Tests", "Tests\RegionStore.Tests\RegionStore.Tests.csproj", "{B9C84D81-EA92-44E1-843D-5194C579D045}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RegionsPlayground", "RegionsPlayground\RegionsPlayground.csproj", "{D78565A1-AD05-47F7-B5B3-2EBB0B5ABB3C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -68,6 +70,10 @@ Global
 		{B9C84D81-EA92-44E1-843D-5194C579D045}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B9C84D81-EA92-44E1-843D-5194C579D045}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B9C84D81-EA92-44E1-843D-5194C579D045}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D78565A1-AD05-47F7-B5B3-2EBB0B5ABB3C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D78565A1-AD05-47F7-B5B3-2EBB0B5ABB3C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D78565A1-AD05-47F7-B5B3-2EBB0B5ABB3C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D78565A1-AD05-47F7-B5B3-2EBB0B5ABB3C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{01871A58-4D16-466C-B2CF-1C2EDF461A72} = {2175073D-ED11-4EE6-9EC4-337627CF35C2}
