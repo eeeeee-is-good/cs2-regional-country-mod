@@ -76,12 +76,41 @@ public static class TextReport
     {
         var sb = new StringBuilder();
         sb.Append("Checked ").Append(report.QuotesChecked).Append(" quotes in region ").Append(manifest.RegionId)
-          .Append(" against log §18.4 invariants #1, #2, #3, #7, #14.\n");
+          .Append(" against log §18.4 invariants #1, #2, #3, #4, #5, #7, #14.\n");
         if (report.Passed) sb.Append("All invariants hold.\n");
         else
         {
             sb.Append(report.Violations.Count).Append(" violation(s):\n");
             foreach (var v in report.Violations) sb.Append("  ").Append(v).Append('\n');
+        }
+        return sb.ToString();
+    }
+
+    public static string Policies(IReadOnlyList<PolicyForecast> forecasts, RegionManifest manifest)
+    {
+        var sb = new StringBuilder();
+        sb.Append("Policies in region ").Append(manifest.RegionId).Append(" (manifest revision ").Append(manifest.Revision).Append(")\n");
+        sb.Append("  FORECAST: modeled estimates per game day, not cash. Nothing is applied to the game.\n");
+        if (forecasts.Count == 0) { sb.Append("  No policies.\n"); return sb.ToString(); }
+
+        var rows = new List<string[]> { new[] { "Policy", "Kind", "Resource", "Mode", "Exposure", "Budget", "Scale", "Spend", "Note" } };
+        foreach (var f in forecasts)
+            rows.Add(new[]
+            {
+                f.PolicyId, f.Kind, f.ResourceId, f.Mode?.ToString() ?? "-", N(f.ExposurePerGameDay), N(f.BudgetPerGameDay),
+                f.Scale is double s ? s.ToString("0.###", CultureInfo.InvariantCulture) : "-", N(f.ForecastSpendPerGameDay), f.Note,
+            });
+        var widths = Enumerable.Range(0, rows[0].Length).Select(c => rows.Max(r => r[c].Length)).ToArray();
+        var numeric = new HashSet<int> { 4, 5, 6, 7 };
+        foreach (var r in rows)
+        {
+            sb.Append("  ");
+            for (var c = 0; c < r.Length; c++)
+            {
+                var cell = c == r.Length - 1 ? r[c] : numeric.Contains(c) ? r[c].PadLeft(widths[c]) : r[c].PadRight(widths[c]);
+                sb.Append(cell).Append(c == r.Length - 1 ? "" : "  ");
+            }
+            sb.Append('\n');
         }
         return sb.ToString();
     }

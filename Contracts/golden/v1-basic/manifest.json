@@ -54,6 +54,7 @@
     "resourcePrices": [
       { "resourceId": "Steel", "regionalProducerPriceIndex": 100, "worldProducerPriceIndex": 128 }
     ],
-    "staleness": { "maxRegionSeqAge": 10 }
+    "staleness": { "maxRegionSeqAge": 10 },
+    "policies": { "importTariffs": [], "freightSubsidies": [] }
   }
 }

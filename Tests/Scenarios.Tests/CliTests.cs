@@ -136,6 +136,21 @@ public sealed class CliTests : IDisposable
     }
 
     [Fact]
+    public void Policies_command_prints_a_labelled_forecast()
+    {
+        var dir = Path.Combine(_temp, "G09");
+        Assert.Equal(Cli.Ok, Run("scenario", "G09", dir).Code);
+        var r = Run("policies", dir);
+        Assert.Equal(Cli.Ok, r.Code);
+        Assert.Contains("FORECAST: modeled estimates per game day, not cash.", r.Out);
+        Assert.Contains("rail-steel", r.Out);
+        Assert.Contains("2550.00", r.Out);
+        Assert.Contains("subsidy scaled down", r.Out);
+
+        Assert.Contains("No policies.", Run("policies", Golden).Out);
+    }
+
+    [Fact]
     public void Writing_never_overwrites_an_existing_folder()
     {
         var dir = Path.Combine(_temp, "G01");

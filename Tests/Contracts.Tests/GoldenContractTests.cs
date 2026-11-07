@@ -189,6 +189,30 @@ public class GoldenContractTests
         Assert.Equal(Enum.GetNames(enumType), schemaValues);
     }
 
+    // ---- 8b. The optional policies block (added within v1 by A7) ----
+
+    [Fact]
+    public void Manifest_without_policies_is_still_valid_v1()
+    {
+        var doc = Raw(System.IO.Path.Combine(Basic, "manifest.json"));
+        doc["parameters"]!.AsObject().Remove("policies");
+        Schemas.AssertValid("region-manifest.v1.schema.json", doc, "manifest without policies");
+        var m = JsonSerializer.Deserialize<RegionManifest>(doc.ToJsonString(), ContractJson.Options)!;
+        Assert.Empty(m.Parameters.Policies.ImportTariffs);
+        Assert.Empty(m.Parameters.Policies.FreightSubsidies);
+    }
+
+    [Theory]
+    [InlineData("/parameters/policies/freightSubsidies", "[{\"policyId\":\"s\",\"resourceId\":\"Steel\",\"mode\":\"Rail\",\"linkIds\":null,\"percentOfFreight\":101,\"budgetPerGameDay\":0}]")]
+    [InlineData("/parameters/policies/importTariffs", "[{\"policyId\":\"t\",\"resourceId\":\"Steel\",\"adValoremPercent\":-1,\"specificPerUnit\":0}]")]
+    [InlineData("/parameters/policies/importTariffs", "[{\"policyId\":\"t\",\"resourceId\":\"Steel\",\"adValoremPercent\":5}]")]
+    public void Manifest_schema_rejects_bad_policies(string pointer, string json)
+    {
+        var doc = Raw(System.IO.Path.Combine(Basic, "manifest.json"));
+        Set(doc, pointer, JsonNode.Parse(json));
+        Assert.NotEmpty(Schemas.Errors("region-manifest.v1.schema.json", doc));
+    }
+
     // ---- 9. Schemas actually reject contract violations ----
 
     [Theory]

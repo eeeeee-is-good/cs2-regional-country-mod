@@ -16,12 +16,14 @@ This covers handoff gate steps 1–4 and research gates A and B. It deliberately
 | J1 Contracts v1 | Schemas, C# DTOs, golden fixture `v1-basic`, 29 tests. Provisional until the second developer reviews it. | `dotnet test Regions.sln` |
 | A1 Solution skeleton | `Regions.sln` builds and tests from a clean clone (.NET 8.0.427). **No CI script yet** (see To do). | `dotnet build Regions.sln` |
 | A3 Engine | Route graph, landed-cost quotes with a per-offer explanation, input hash for replay. | `regions quote Contracts/golden/v1-basic` |
-| A5 Simulator + invariant checker | Synthetic cities, built-in regions G01, G02, G03, G10 and `corridor`, checks for log §18.4 #1, #2, #3, #7, #14. | `regions scenarios`, `regions check <folder>` |
+| A4 Supply rule | Provisional and missing figures are downgraded (×0.5 each) instead of excluded; `Unknown` stays excluded. | `regions quote` shows each factor |
+| A5 Simulator + invariant checker | Synthetic cities, built-in regions G01–G05, G09, G10 and `corridor`, checks for log §18.4 #1, #2, #3, #4, #5, #7, #14. | `regions scenarios`, `regions check <folder>` |
+| A7 Tariffs and subsidies | Import tariffs (world offers only), budget-capped freight subsidies, forecast of exposure and spend. | `regions policies <folder>` |
 | A6 `regions` CLI | `quote`, `check`, `scenarios`, `scenario`, `ingest`. See [ScenarioRunner/README.md](../ScenarioRunner/README.md). | `dotnet run --project ScenarioRunner -- help` |
 | A2 Region store | Inbox ingestion with duplicate, conflict and corrupt-file handling, atomic writes, crash recovery, hash-verified reads. See [RegionStore/README.md](../RegionStore/README.md). | `regions ingest <folder>` |
 | B0 (static part) | Game 1.6.2f1 matches the research baseline; mod lifecycle and load/save signals confirmed in the game code; framework, JSON and `ModsData/` confirmed on disk. See [ASSUMPTIONS.md](ASSUMPTIONS.md). | — |
 
-Tests: 583 pass (Contracts 29, Engine 358, Scenarios 154, RegionStore 42).
+Tests: 629 pass (Contracts 33, Engine 387, Scenarios 167, RegionStore 42).
 
 ### Acceptance criteria
 | # | Criterion | Status |
@@ -37,7 +39,7 @@ Tests: 583 pass (Contracts 29, Engine 358, Scenarios 154, RegionStore 42).
 
 ### To do: engine only (no game needed)
 1. ~~**A4 supply rule.**~~ Done 2026-11-06 (see the A4 row).
-2. **A7 tariffs and subsidies** (G04, G05, G09). Pure math, labelled as forecasts.
+2. ~~**A7 tariffs and subsidies**~~ Done 2026-11-06 (see the A7 row).
 3. **A1 leftover: CI script**, for example a GitHub Actions workflow running `dotnet build` and `dotnet test` on every push.
 4. **Open decisions to review:**
    - RegionStore: the net8.0 target, its extra rejection rules, and the exporter/inbox protocol question.
@@ -77,7 +79,7 @@ Dev B runs the V-02/V-03 spikes first, because they decide whether the mod can r
 | A4 | Supply eligibility: `min(surplus, capacity) × confidence`, staleness exclusion, null = unknown | Tests show stale, null and zero cases behave as specified. **Done 2026-11-06** (engine 0.2.0): Provisional ×0.5; a missing `inputUse` or `capacity` each ×0.5 instead of exclusion; `Unknown` confidence or missing output stays `UnknownSupply`; `maxRegionSeqAge` kept. Rule in Contracts/README.md and `SupplyRule.cs`; the CLI shows each factor. |
 | A5 | `CitySimulator` + scenario fixtures + invariant checker (§18.4 #1, 2, 3, 7, 8, 14) + replay test | G06 and replay pass; property tests on random graphs. **Done 2026-11-06** (merged): `SyntheticCity`, `RegionScenario`, built-in scenarios G01, G02, G03, G10 and `corridor`; `InvariantChecker` covers #1, #2, #3, #7, #14 and is proven against deliberately broken engines; passes on every scenario and 100 random regions. G06 is tested at the quote layer only. **#8 and store-level G06 (identical re-ingestion is a no-op) move to A2.** |
 | A6 | `ScenarioRunner` CLI: fixture folder in, quotes and traces out (JSON + readable text) | Runs against the golden fixtures. **Done 2026-11-06** (merged): `regions quote / check / scenarios / scenario`; validates inputs against the schemas and snapshot hashes against the index; JSON output byte-identical to the engine's quote. See [ScenarioRunner/README.md](../ScenarioRunner/README.md). |
-| A7 | *Stretch:* foreign import tariff eligibility (G04) and corridor subsidy forecast with budget cap (G05, G09). Pure math, labelled as forecast. | Tests pass |
+| A7 | *Stretch:* foreign import tariff eligibility (G04) and corridor subsidy forecast with budget cap (G05, G09). Pure math, labelled as forecast. | Tests pass. **Done 2026-11-06** (engine 0.3.0): optional `parameters.policies` in the manifest (an additive v1 Contracts change, provisional until the second developer reviews it); tariffs on world offers only; budget-scaled freight subsidies on qualifying domestic links; `regions policies` forecast; checker rules #4 and #5; scenarios G04, G05, G09. Rules in Contracts/README.md "Policies". |
 
 ### Developer B — read-only CS2 mod (needs the game)
 | ID | Task | Verifies | Done when |

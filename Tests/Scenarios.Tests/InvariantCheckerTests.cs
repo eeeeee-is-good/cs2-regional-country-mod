@@ -88,6 +88,34 @@ public class InvariantCheckerTests
             foreach (var o in q.Offers.Where(o => o.Eligible)) { o.ProducerPrice -= 50; o.LandedPrice -= 50; }
         });
 
+    [Fact]
+    public void Detects_customs_charged_on_domestic_trade() =>
+        AssertCatches(InvariantChecker.TariffSpecificity, (state, q) =>
+        {
+            var tariff = state.Manifest.Parameters.Policies.ImportTariffs.FirstOrDefault();
+            if (tariff == null) return;
+            foreach (var o in q.Offers.Where(o => o.Eligible && o.OriginKind == OriginKind.City))
+            {
+                var duty = o.ProducerPrice!.Value * tariff.AdValoremPercent / 100;
+                o.Tariff = duty; o.LandedPrice += duty;
+            }
+        }, Scenarios.Build("G04").ToState());
+
+    [Fact]
+    public void Detects_a_subsidy_leaking_to_world_offers() =>
+        AssertCatches(InvariantChecker.SubsidySpecificity, (state, q) =>
+        {
+            if (state.Manifest.Parameters.Policies.FreightSubsidies.Count == 0) return;
+            foreach (var o in q.Offers.Where(o => o.Eligible && o.OriginKind == OriginKind.World)) { o.Subsidy = 1; o.LandedPrice -= 1; }
+        }, Scenarios.Build("G05").ToState());
+
+    [Fact]
+    public void Detects_a_subsidy_larger_than_the_freight() =>
+        AssertCatches(InvariantChecker.SubsidySpecificity, (_, q) =>
+        {
+            foreach (var o in q.Offers.Where(o => o.Eligible && o.OriginKind == OriginKind.City)) { o.Subsidy = o.Freight + 5; o.LandedPrice = o.ProducerPrice - 5; }
+        }, Scenarios.Build("G05").ToState());
+
     private static void AssertCatches(string invariant, Action<RegionState, QuoteResult> corrupt, RegionState? state = null)
     {
         var report = new BrokenEngine(corrupt).Check(state ?? Golden());
@@ -143,6 +171,12 @@ public class InvariantCheckerTests
         }
         for (var i = 0; i < n; i++)
             if (rng.Next(3) == 0) region.WorldGateway($"c{i}", "oc-road", TransportMode.Road, rng.Next(0, 300));
+
+        // A7 policies, so #4 and #5 are exercised on random graphs too.
+        if (rng.Next(2) == 0) region.ImportTariff("tariff-steel", "Steel", rng.Next(0, 60), rng.Next(3) == 0 ? rng.Next(0, 20) : 0);
+        foreach (var mode in new[] { TransportMode.Road, TransportMode.Rail, TransportMode.Ship })
+            if (rng.Next(3) == 0)
+                region.FreightSubsidy($"sub-{mode}".ToLowerInvariant(), "Steel", mode, rng.Next(0, 101), rng.Next(4) == 0 ? 0 : rng.Next(0, 5000));
         return region;
     }
 }

@@ -87,6 +87,27 @@ namespace Regions.Engine
             foreach (var r in prices) { w.Str(r.ResourceId); w.Num(r.RegionalProducerPriceIndex); w.Num(r.WorldProducerPriceIndex); }
 
             w.Int(m.Parameters.Staleness.MaxRegionSeqAge);
+
+            // A missing optional policies block means no policies, so it hashes like an empty one.
+            var policies = m.Parameters.Policies ?? new PolicySet();
+            var tariffs = policies.ImportTariffs.OrderBy(t => t.PolicyId, StringComparer.Ordinal).ToList();
+            w.Int(tariffs.Count);
+            foreach (var t in tariffs) { w.Str(t.PolicyId); w.Str(t.ResourceId); w.Num(t.AdValoremPercent); w.Num(t.SpecificPerUnit); }
+
+            var subsidies = policies.FreightSubsidies.OrderBy(s => s.PolicyId, StringComparer.Ordinal).ToList();
+            w.Int(subsidies.Count);
+            foreach (var s in subsidies)
+            {
+                w.Str(s.PolicyId); w.Str(s.ResourceId); w.Enum(s.Mode);
+                w.Bool(s.LinkIds != null);
+                if (s.LinkIds != null)
+                {
+                    var ids = s.LinkIds.OrderBy(x => x, StringComparer.Ordinal).ToList();
+                    w.Int(ids.Count);
+                    foreach (var id in ids) w.Str(id);
+                }
+                w.Num(s.PercentOfFreight); w.Num(s.BudgetPerGameDay);
+            }
         }
 
         private static void WriteSnapshot(Writer w, CitySnapshot s)

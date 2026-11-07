@@ -69,6 +69,8 @@ namespace Regions.Engine
                 if (!Num.IsFiniteNonNegative(r.WorldProducerPriceIndex)) p.Add($"resourcePrices[{r.ResourceId}]: worldProducerPriceIndex must be finite and >= 0");
             }
 
+            ValidatePolicies(m, p);
+
             if (m.Parameters.Staleness.MaxRegionSeqAge < 0) p.Add("staleness.maxRegionSeqAge must be >= 0 or null");
             if (state.CurrentRegionSeq < 0) p.Add("currentRegionSeq must be >= 0");
 
@@ -102,6 +104,43 @@ namespace Regions.Engine
                 if (!defIds.Add(d.ResourceId)) p.Add($"resources[{d.ResourceId}]: duplicate definition");
 
             return p;
+        }
+
+        private static void ValidatePolicies(RegionManifest m, List<string> p)
+        {
+            var policies = m.Parameters.Policies;
+            if (policies == null) return; // a missing optional block means no policies
+            if (policies.ImportTariffs == null || policies.FreightSubsidies == null) { p.Add("policies: a list is null"); return; }
+
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            var tariffResources = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var t in policies.ImportTariffs)
+            {
+                var id = t.PolicyId ?? "";
+                if (id.Length == 0 || !ids.Add(id)) p.Add($"policies[{id}]: empty or duplicate policyId");
+                if (!tariffResources.Add(t.ResourceId)) p.Add($"policies[{id}]: more than one import tariff for {t.ResourceId}");
+                if (!Num.IsFiniteNonNegative(t.AdValoremPercent)) p.Add($"policies[{id}]: adValoremPercent must be finite and >= 0");
+                if (!Num.IsFiniteNonNegative(t.SpecificPerUnit)) p.Add($"policies[{id}]: specificPerUnit must be finite and >= 0");
+            }
+
+            var links = new Dictionary<string, LinkEntry>(StringComparer.Ordinal);
+            foreach (var l in m.Links) if (l.LinkId != null && !links.ContainsKey(l.LinkId)) links[l.LinkId] = l;
+            var subsidyKeys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var s in policies.FreightSubsidies)
+            {
+                var id = s.PolicyId ?? "";
+                if (id.Length == 0 || !ids.Add(id)) p.Add($"policies[{id}]: empty or duplicate policyId");
+                if (!subsidyKeys.Add(s.ResourceId + "\u0000" + s.Mode)) p.Add($"policies[{id}]: more than one freight subsidy for {s.ResourceId} by {s.Mode}");
+                if (!Num.IsFinite(s.PercentOfFreight) || s.PercentOfFreight < 0 || s.PercentOfFreight > 100) p.Add($"policies[{id}]: percentOfFreight must be between 0 and 100");
+                if (!Num.IsFiniteNonNegative(s.BudgetPerGameDay)) p.Add($"policies[{id}]: budgetPerGameDay must be finite and >= 0");
+                if (s.LinkIds == null) continue;
+                if (s.LinkIds.Distinct(StringComparer.Ordinal).Count() != s.LinkIds.Count) p.Add($"policies[{id}]: duplicate linkIds");
+                foreach (var linkId in s.LinkIds)
+                {
+                    if (!links.TryGetValue(linkId, out var link)) p.Add($"policies[{id}]: unknown link {linkId}");
+                    else if (link.Mode != s.Mode) p.Add($"policies[{id}]: link {linkId} is {link.Mode}, the subsidy is for {s.Mode}");
+                }
+            }
         }
     }
 }

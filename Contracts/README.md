@@ -74,8 +74,14 @@ Hashes are lowercase hex SHA-256 of the **exact file bytes**. Hashing happens at
 ## Quote semantics fixed by the contract (`golden/v1-basic/expected/`)
 
 - **One offer per supplier city** (every city in the manifest except the destination that has a snapshot with this resource), plus one offer per world gateway of the **destination**. In v1, world access goes only through the destination's own gateways.
-- City offer: `producerPrice = regionalProducerPriceIndex`, `freight = Σ over links (fixedCost + costPerKm × distanceKm)` along the cheapest eligible path, `landedPrice = producerPrice + freight + tariff − subsidy`. Tariff and subsidy are 0 until A7.
-- World offer: `producerPrice = worldProducerPriceIndex`, `freight = fixedCost + costPerKm × gateway.distanceKm`.
+- City offer: `producerPrice = regionalProducerPriceIndex`, `freight = Σ over links (fixedCost + costPerKm × distanceKm)` along the cheapest eligible path, `landedPrice = producerPrice + freight + tariff − subsidy`. A city offer's `tariff` is always 0: customs never applies to domestic trade (D-44).
+- World offer: `producerPrice = worldProducerPriceIndex`, `freight = fixedCost + costPerKm × gateway.distanceKm`. A world offer's `subsidy` is always 0: domestic freight support never applies to the foreign leg.
+- **Policies** (A7, engine 0.3.0, `parameters.policies`, optional within v1; a missing block means none). See `RegionalEngine/src/PolicyEvaluator.cs`.
+  - **Import tariff** (at most one per resource): `tariff = worldProducerPrice × adValoremPercent / 100 + specificPerUnit` on world offers.
+  - **Freight subsidy** (at most one per resource and mode): `percentOfFreight` of the freight on qualifying links of the path (that mode; `linkIds`, or all links of the mode when null), times a budget scale. The subsidy is never more than the freight.
+  - **Path choice** uses unsubsidised freight: a subsidy lowers the price on the physically cheapest path; it does not change which path is used.
+  - **Budget scale** (region-wide, deterministic): `exposure = Σ over supplier cities of effectiveOffer × best subsidy per unit to any destination`; `scale = exposure ≤ budget ? 1 : budget / exposure`. A zero budget stops the subsidy. Because the budget is shared, a supplier elsewhere can dilute a subsidy. This is the one intended link between otherwise separate quotes, and `regions policies` shows it.
+  - Exposure and spend are **forecasts**, never cash. Tariff revenue is not estimated, because import volumes are not tracked (D-42).
 - A link mode is usable for a resource only if it is in that resource's `allowedFreightModes`. Utility connections are never freight.
 - When an offer has several exclusion reasons, report the first in this order: `UnknownResource` → `NoPath` / `ModeIncompatible` → `StaleSnapshot` → `UnknownSupply` → `NoSupply`.
 - `effectiveRegionalOfferPerGameDay = min(output − inputUse, capacity) × confidenceFactor × penalties` (decided in A4, engine 0.2.0, `RegionalEngine/src/SupplyRule.cs`). Unverified data is downgraded, not excluded (log §25.3):

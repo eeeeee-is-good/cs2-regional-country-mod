@@ -79,6 +79,26 @@ namespace Regions.Simulator
             return this;
         }
 
+        public RegionScenario ImportTariff(string policyId, string resourceId, double adValoremPercent, double specificPerUnit = 0)
+        {
+            Manifest.Parameters.Policies.ImportTariffs.Add(new ImportTariff
+            {
+                PolicyId = policyId, ResourceId = resourceId, AdValoremPercent = adValoremPercent, SpecificPerUnit = specificPerUnit,
+            });
+            return this;
+        }
+
+        public RegionScenario FreightSubsidy(string policyId, string resourceId, TransportMode mode, double percentOfFreight,
+                                             double budgetPerGameDay, params string[] linkIds)
+        {
+            Manifest.Parameters.Policies.FreightSubsidies.Add(new FreightSubsidy
+            {
+                PolicyId = policyId, ResourceId = resourceId, Mode = mode, PercentOfFreight = percentOfFreight,
+                BudgetPerGameDay = budgetPerGameDay, LinkIds = linkIds.Length == 0 ? null : linkIds.ToList(),
+            });
+            return this;
+        }
+
         /// <summary>Accepts a snapshot as the city's latest and returns the RegionSeq it was assigned.</summary>
         public int Publish(CitySnapshot snapshot)
         {
@@ -107,6 +127,10 @@ namespace Regions.Simulator
             });
             Sort(Manifest.Parameters.ModeCosts, (x, y) => x.Mode.CompareTo(y.Mode));
             Sort(Manifest.Parameters.ResourcePrices, (x, y) => string.CompareOrdinal(x.ResourceId, y.ResourceId));
+            Sort(Manifest.Parameters.Policies.ImportTariffs, (x, y) => string.CompareOrdinal(x.PolicyId, y.PolicyId));
+            Sort(Manifest.Parameters.Policies.FreightSubsidies, (x, y) => string.CompareOrdinal(x.PolicyId, y.PolicyId));
+            foreach (var s in Manifest.Parameters.Policies.FreightSubsidies)
+                if (s.LinkIds != null) Sort(s.LinkIds, string.CompareOrdinal);
             return this;
         }
 

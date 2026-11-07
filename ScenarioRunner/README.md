@@ -28,6 +28,7 @@ dotnet run --project ScenarioRunner -- check ../my-regions/corridor
 | `scenario <name> <folder>` | Writes one as a new region folder. Refuses a non-empty folder; nothing is overwritten. |
 | `quote <folder> [--dest <cityId>] [--resource <id>] [--json <outFolder>]` | Prints quotes. `--json` also writes `quote.<dest>.<resource>.json` (schema-valid, byte-identical to the engine output). |
 | `check <folder>` | Quotes every city and resource and runs the invariant checker. Exit code 1 if anything fails. |
+| `policies <folder>` | Forecast for every import tariff and freight subsidy: exposure, budget, the scale applied, and the forecast spend. Labelled as estimates, not cash. |
 | `ingest <folder>` | Accepts new snapshot files from `<folder>/inbox/` and lists every duplicate, conflict and rejected file. Exit code 1 if there are conflicts or rejections. |
 | `--resources <file>` | Use another resource table instead of the bundled `Contracts/resources/resource-ids.v1.json`. |
 
