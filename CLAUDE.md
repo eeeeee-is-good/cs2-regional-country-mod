@@ -1,6 +1,12 @@
 # CLAUDE.md — CS2 Regional/Country Mod
 
-Two developers each work with Claude Code. These rules are mandatory for both.
+The project is designed for two developers, each working with Claude Code. These rules are mandatory for both.
+
+> **Current staffing (2026-11-06):** only one developer is working on the project for now. A second developer (a friend) is expected to join later, but no date is set. Until then:
+> - The single developer owns **both** tracks (Developer A and Developer B areas) and may edit either.
+> - "PR reviewed by both developers" means self-review of a PR before merge. Keep using short feature branches and PRs, so the second developer can review the history when they join.
+> - Contracts v1 and any Contracts changes made before then stay **provisional** until the second developer has reviewed them.
+> - Keep the A/B ownership split in the docs. It still describes how work divides once the second developer joins.
 
 ## Read order and authority
 1. This file, then [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). These are authoritative.
