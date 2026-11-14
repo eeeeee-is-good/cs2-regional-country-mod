@@ -113,4 +113,98 @@ public class PlaygroundTests
         var back = JsonSerializer.Deserialize<PlaygroundModel>(json, options)!;
         Assert.Equal(JsonSerializer.Serialize(back, options), json);
     }
+
+    private static SimulationRequest Request(string scenario, int periods, bool people = false, params string[] frozen) => new()
+    {
+        Model = Playground.Playground.FromScenario(Simulator.Scenarios.Build(scenario)), Periods = periods, People = people, Frozen = frozen.ToList(),
+    };
+
+    [Fact]
+    public void Simulation_runs_every_period_for_every_city_and_is_deterministic()
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
+        var r = Playground.Playground.Simulate(Request("G03", 30, people: true));
+        Assert.Empty(r.Errors);
+        Assert.Equal(Enumerable.Range(1, 30), r.Periods);
+        foreach (var name in SimulationResult.MetricNames)
+            foreach (var city in new[] { "ironvale", "carford" })
+                Assert.Equal(30, r.Metrics[name][city].Count);
+        Assert.All(r.Metrics["population"]["carford"], v => Assert.NotNull(v));
+        Assert.Equal(JsonSerializer.Serialize(r, options), JsonSerializer.Serialize(Playground.Playground.Simulate(Request("G03", 30, people: true)), options));
+    }
+
+    [Fact]
+    public void Simulation_starts_from_the_prices_the_map_shows()
+    {
+        var request = Request("corridor", 1);
+        var analysis = Playground.Playground.Analyze(request.Model);
+        var r = Playground.Playground.Simulate(request);
+        foreach (var (city, a) in analysis.Cities)
+        {
+            var q = a.Quote!;
+            if (q.SelectedOfferIndex == null) continue;
+            Assert.Equal(q.Offers[q.SelectedOfferIndex.Value].LandedPrice!.Value, r.Metrics["buyTarget"][city][0]!.Value, 9);
+        }
+    }
+
+    [Fact]
+    public void Simulation_without_people_has_no_population_and_frozen_cities_stay_put()
+    {
+        var r = Playground.Playground.Simulate(Request("corridor", 20, people: false));
+        Assert.All(r.Metrics["population"].Values.SelectMany(v => v), v => Assert.Null(v));
+
+        var frozen = Playground.Playground.Simulate(Request("corridor", 20, people: true, "midway"));
+        Assert.Empty(frozen.Errors);
+        Assert.Single(frozen.Metrics["population"]["midway"].Distinct());
+        Assert.NotNull(frozen.Metrics["buy"]["midway"][0]);           // it played period 1, so it has a price to keep
+        Assert.Single(frozen.Metrics["buy"]["midway"].Distinct());
+        Assert.Single(frozen.Metrics["output"]["midway"].Distinct());
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(501)]
+    public void Simulation_rejects_bad_period_counts(int periods)
+    {
+        Assert.NotEmpty(Playground.Playground.Simulate(Request("G03", periods)).Errors);
+    }
+
+    [Fact]
+    public void Simulation_reports_an_invalid_map()
+    {
+        var request = new SimulationRequest { Model = Playground.Playground.Empty(), Periods = 5 };
+        request.Model.Links.Add(new PlaygroundLink { Id = "link-1", A = "city-1", B = "city-9", Mode = TransportMode.Road, DistanceKm = 5 });
+        Assert.NotEmpty(Playground.Playground.Simulate(request).Errors);
+    }
+
+    [Fact]
+    public void A_world_price_shock_moves_import_prices_gradually()
+    {
+        var request = Request("G01", 40);                       // Carford imports at 140
+        request.Shock = new SimulationShock { AtPeriod = 5, WorldPricePercent = 50 };
+        var r = Playground.Playground.Simulate(request);
+        Assert.Empty(r.Errors);
+        var buy = r.Metrics["buy"]["carford"].Select(v => v!.Value).ToArray();
+        Assert.Equal(buy[0], buy[3], 9);                         // unchanged before the shock
+        Assert.True(buy[^1] > buy[3] + 10);
+        for (var i = 1; i < buy.Length; i++) Assert.True(Math.Abs(buy[i] - buy[i - 1]) <= 2 + 1e-9, $"period {i + 1}");
+    }
+
+    [Fact]
+    public void A_capacity_cut_lowers_output_and_bad_shocks_are_rejected()
+    {
+        var request = Request("G03", 20, people: true);
+        request.Shock = new SimulationShock { AtPeriod = 3, CityId = "ironvale", CapacityPercent = -50, UsePercent = 20 };
+        var r = Playground.Playground.Simulate(request);
+        Assert.Empty(r.Errors);
+        var capacity = r.Metrics["capacity"]["ironvale"];
+        Assert.True(capacity[2] < capacity[1] * 0.6);
+
+        request.Shock = new SimulationShock { AtPeriod = 30 };
+        Assert.NotEmpty(Playground.Playground.Simulate(request).Errors);
+        request.Shock = new SimulationShock { AtPeriod = 3, CapacityPercent = -10 };
+        Assert.NotEmpty(Playground.Playground.Simulate(request).Errors);
+        request.Shock = new SimulationShock { AtPeriod = 3, WorldPricePercent = -150 };
+        Assert.NotEmpty(Playground.Playground.Simulate(request).Errors);
+    }
 }

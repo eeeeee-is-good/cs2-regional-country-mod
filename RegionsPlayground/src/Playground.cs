@@ -143,6 +143,88 @@ public static class Playground
         return new RegionState(manifest, snapshots, regionSeq, RegionScenario.DefaultResources());
     }
 
+    /// <summary>The same region as ToState, as a simulator scenario (cities published in map order).</summary>
+    public static RegionScenario ToScenario(PlaygroundModel model)
+    {
+        var state = ToState(model);
+        var scenario = new RegionScenario("sandbox", "Region built in the sandbox");
+        scenario.Manifest.RegionId = state.Manifest.RegionId;
+        scenario.Manifest.Cities = state.Manifest.Cities;
+        scenario.Manifest.Links = state.Manifest.Links;
+        scenario.Manifest.WorldGateways = state.Manifest.WorldGateways;
+        scenario.Manifest.Parameters = state.Manifest.Parameters;
+        foreach (var pub in state.LatestSnapshots) scenario.Publish(pub.Snapshot);
+        return scenario;
+    }
+
+    public const int MaxPeriods = 500;
+
+    /// <summary>
+    /// Runs the map over time in the synthetic simulator (Phases 1-4): applied prices step toward the engine's
+    /// targets and synthetic cities react. Frozen cities play period 1, publish, then are unloaded. Synthetic results, not CS2.
+    /// </summary>
+    public static SimulationResult Simulate(SimulationRequest request)
+    {
+        var result = new SimulationResult();
+        if (request.Periods < 1 || request.Periods > MaxPeriods) { result.Errors.Add($"periods must be 1 to {MaxPeriods}"); return result; }
+        if (request.Shock is { } sh)
+        {
+            if (sh.AtPeriod < 1 || sh.AtPeriod > request.Periods) result.Errors.Add($"the change must happen in period 1 to {request.Periods}");
+            foreach (var pct in new[] { sh.WorldPricePercent, sh.CapacityPercent, sh.UsePercent })
+                if (!double.IsFinite(pct) || pct < -100 || pct > 1000) result.Errors.Add("changes must be between -100% and +1000%");
+            if ((sh.CapacityPercent != 0 || sh.UsePercent != 0) && request.Model.Cities.All(c => c.Id != sh.CityId))
+                result.Errors.Add("pick the city whose capacity or use changes");
+            if (result.Errors.Count > 0) return result;
+        }
+        var check = Analyze(request.Model);
+        if (check.Errors.Count > 0) { result.Errors.AddRange(check.Errors); return result; }
+
+        var sim = RegionSimulation.From(ToScenario(request.Model));
+        if (request.People) PeopleDynamics.Attach(sim);
+        var cities = request.Model.Cities.Select(c => c.Id).ToList();
+        foreach (var name in SimulationResult.MetricNames)
+            result.Metrics[name] = cities.ToDictionary(c => c, _ => new List<double?>());
+
+        try
+        {
+            for (var i = 0; i < request.Periods; i++)
+            {
+                if (i == 1) foreach (var id in request.Frozen) sim.Frozen.Add(id); // loaded for period 1, then unloaded
+                if (request.Shock is { } shock && shock.AtPeriod == i + 1) ApplyShock(sim, shock);
+                var rec = sim.Step();
+                result.Periods.Add(rec.Period);
+                foreach (var c in cities)
+                {
+                    var s = sim.Signal(c, Resource);
+                    sim.Goods.TryGetValue(RegionSimulation.Key(c, Resource), out var g);
+                    sim.People.TryGetValue(c, out var p);
+                    result.Metrics["buy"][c].Add(s?.Buy.Applied);
+                    result.Metrics["buyTarget"][c].Add(s?.Buy.Target);
+                    result.Metrics["sell"][c].Add(s?.Sell.Applied);
+                    result.Metrics["output"][c].Add(g?.Output);
+                    result.Metrics["use"][c].Add(g?.TotalUse);
+                    result.Metrics["capacity"][c].Add(g?.Capacity);
+                    result.Metrics["population"][c].Add(p?.TotalPopulation);
+                    result.Metrics["unemployment"][c].Add(p == null ? null : p.UnemploymentRate * 100);
+                    result.Metrics["commutersIn"][c].Add(p?.CommutersIn);
+                }
+            }
+        }
+        catch (RegionStateException ex) { result.Errors.AddRange(ex.Problems); }
+        return result;
+    }
+
+    private static void ApplyShock(RegionSimulation sim, SimulationShock shock)
+    {
+        foreach (var price in sim.Scenario.Manifest.Parameters.ResourcePrices.Where(p => p.ResourceId == Resource))
+            price.WorldProducerPriceIndex *= 1 + shock.WorldPricePercent / 100;
+        if (shock.CityId == null || !sim.Goods.TryGetValue(RegionSimulation.Key(shock.CityId, Resource), out var g)) return;
+        var capacity = 1 + shock.CapacityPercent / 100;   // a fire or a new plant: the space, the plants and their output
+        g.Capacity *= capacity; g.SpaceCapacity *= capacity; g.BaseOutput *= capacity;
+        var use = 1 + shock.UsePercent / 100;             // a recession or a boom in what the city uses
+        g.IndustrialUse *= use; g.BaseConsumerUse *= use; g.InitialConsumerUse *= use;
+    }
+
     public static Analysis Analyze(PlaygroundModel model)
     {
         var result = new Analysis();
@@ -250,4 +332,32 @@ public static class Playground
             });
         return model;
     }
+}
+
+/// <summary>One change during a run: the world price, and one city's capacity and use, scale by a percentage.</summary>
+public sealed class SimulationShock
+{
+    public int AtPeriod { get; set; } = 10;
+    public double WorldPricePercent { get; set; }
+    public string? CityId { get; set; }
+    public double CapacityPercent { get; set; }
+    public double UsePercent { get; set; }
+}
+
+public sealed class SimulationRequest
+{
+    public PlaygroundModel Model { get; set; } = new();
+    public int Periods { get; set; } = 40;
+    public bool People { get; set; }
+    public List<string> Frozen { get; set; } = new();
+    public SimulationShock? Shock { get; set; }
+}
+
+/// <summary>Per metric, per city, one value per period (null when it does not apply). Synthetic, not CS2.</summary>
+public sealed class SimulationResult
+{
+    public static readonly string[] MetricNames = { "buy", "buyTarget", "sell", "output", "use", "capacity", "population", "unemployment", "commutersIn" };
+    public List<string> Errors { get; set; } = new();
+    public List<int> Periods { get; set; } = new();
+    public Dictionary<string, Dictionary<string, List<double?>>> Metrics { get; set; } = new();
 }
