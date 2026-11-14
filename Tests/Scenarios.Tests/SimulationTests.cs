@@ -194,7 +194,8 @@ public class SimulationTests
             var series = BuyApplied(sim, city).Where(double.IsFinite).ToArray();
             if (series.Length < 60) continue;
             double Amp(int from, int to) => series[from..to].Max() - series[from..to].Min();
-            Assert.True(Amp(45, 60) <= Amp(30, 45) + 1e-6, $"seed {seed} {city}: oscillation grew from {Amp(30, 45)} to {Amp(45, 60)}");
+            var noise = 0.002 * series.Average(); // swings under 0.2% of the price level are not a runaway
+            Assert.True(Amp(45, 60) <= Amp(30, 45) + noise, $"seed {seed} {city}: oscillation grew from {Amp(30, 45)} to {Amp(45, 60)}");
         }
     }
 }

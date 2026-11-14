@@ -28,6 +28,7 @@ public static class Cli
           regions simulate <scenario> [options] Run a built-in region over time with synthetic cities that react to prices.
             --periods <n>                         How many periods (default 30).
             --freeze <city,city>                  Unloaded cities: they neither react nor publish.
+            --people                              Also simulate jobs, housing, commuting, migration and businesses.
           regions exposure <folder>             FORECAST: what each city will meet when it returns (after advance).
           regions advance <folder> [options]    Move the region forward: applied prices step toward the targets.
             --periods <n>                         How many periods (default 1).
@@ -96,6 +97,7 @@ public static class Cli
                     var region = Scenarios.Build(positional[1]);
                     region.Manifest.Parameters.Scarcity ??= new ScarcityRule { PremiumSlope = 0.25, MaxPremium = 1.0 };
                     var sim = RegionSimulation.From(region);
+                    if (options.ContainsKey("people")) PeopleDynamics.Attach(sim);
                     if (options.TryGetValue("freeze", out var frozen))
                         foreach (var c in frozen.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) sim.Frozen.Add(c);
                     var periods = options.TryGetValue("periods", out var p) ? ParseInt(p, "periods", 1, 10_000) : 30;
@@ -193,7 +195,8 @@ public static class Cli
         if (positional.Count < count) throw new UsageException($"usage: {usage}");
     }
 
-    private static readonly HashSet<string> KnownOptions = new() { "dest", "resource", "json", "resources", "periods", "inactive", "step", "freeze" };
+    private static readonly HashSet<string> KnownOptions = new() { "dest", "resource", "json", "resources", "periods", "inactive", "step", "freeze", "people" };
+    private static readonly HashSet<string> FlagOptions = new() { "people" };
 
     private static int ParseInt(string text, string name, int min, int max)
     {
@@ -218,6 +221,7 @@ public static class Cli
             if (!args[i].StartsWith("--", StringComparison.Ordinal) || args[i] == "--help") { positional.Add(args[i]); continue; }
             var name = args[i][2..];
             if (!KnownOptions.Contains(name)) throw new UsageException($"unknown option --{name}");
+            if (FlagOptions.Contains(name)) { options[name] = "true"; continue; }
             if (i + 1 >= args.Length) throw new UsageException($"--{name} needs a value");
             options[name] = args[++i];
         }
