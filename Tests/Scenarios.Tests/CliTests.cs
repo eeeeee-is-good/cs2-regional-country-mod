@@ -136,6 +136,21 @@ public sealed class CliTests : IDisposable
     }
 
     [Fact]
+    public void Advance_command_moves_periods_and_freezes_inactive_cities()
+    {
+        var dir = Path.Combine(_temp, "G03");
+        Assert.Equal(Cli.Ok, Run("scenario", "G03", dir).Code);
+        var r = Run("advance", dir, "--periods", "3", "--inactive", "ironvale");
+        Assert.True(r.Code == Cli.Ok, r.Err);
+        Assert.Contains("Region period 3.", r.Out);
+        Assert.Contains("Frozen", r.Out);
+        Assert.True(File.Exists(Path.Combine(dir, "signals", "state.json")));
+        Assert.Contains("Region period 4.", Run("advance", dir).Out);
+        Assert.Equal(Cli.UsageOrInputError, Run("advance", dir, "--periods", "0").Code);
+        Assert.Equal(Cli.UsageOrInputError, Run("advance", dir, "--step", "-1").Code);
+    }
+
+    [Fact]
     public void Policies_command_prints_a_labelled_forecast()
     {
         var dir = Path.Combine(_temp, "G09");

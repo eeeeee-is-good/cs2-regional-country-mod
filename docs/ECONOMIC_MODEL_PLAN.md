@@ -11,7 +11,8 @@ The developer asked for Phases 0–4 to be built, with the decisions below taken
 | Phase | Status |
 |---|---|
 | 0. Consistency fixes | **Done**, engine 0.5.0: D1 ageing on both sides (`Freshness.cs`); D2 documented (`DemandRule`); demand-aware subsidy exposure. |
-| 1–4 | In progress (see the sections below as each lands). |
+| 1. Time and gradual signals | **Done:** `SignalPlanner` (target vs applied, D3 step, frozen when inactive, reference price for Phase 3), `FileRegionStore.AdvancePeriod` with `signals/state.json`, `regions advance`. A price cache was not needed: a full region quote takes milliseconds; revisit with G11. |
+| 2–4 | In progress. |
 
 **Decisions taken:**
 - **D1:** fade supply and demand together. Full weight to half the limit, linear to 0 beyond it.
