@@ -25,6 +25,9 @@ public static class Cli
           regions check <folder>                Quote everything and check the log §18.4 invariants.
           regions ingest <folder>               Accept new snapshot files from <folder>/inbox and report conflicts.
           regions policies <folder>             Forecast of every tariff and subsidy: exposure, budget, scale.
+          regions simulate <scenario> [options] Run a built-in region over time with synthetic cities that react to prices.
+            --periods <n>                         How many periods (default 30).
+            --freeze <city,city>                  Unloaded cities: they neither react nor publish.
           regions advance <folder> [options]    Move the region forward: applied prices step toward the targets.
             --periods <n>                         How many periods (default 1).
             --inactive <city,city>                Unloaded cities: their applied prices stay frozen.
@@ -84,6 +87,20 @@ public static class Cli
                     var report = new LandedCostEngine().Check(state);
                     stdout.Write(TextReport.Check(report, state.Manifest));
                     return report.Passed ? Ok : CheckFailed;
+                }
+
+                case "simulate":
+                {
+                    Require(positional, 2, "regions simulate <scenario>");
+                    var region = Scenarios.Build(positional[1]);
+                    region.Manifest.Parameters.Scarcity ??= new ScarcityRule { PremiumSlope = 0.25, MaxPremium = 1.0 };
+                    var sim = RegionSimulation.From(region);
+                    if (options.TryGetValue("freeze", out var frozen))
+                        foreach (var c in frozen.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) sim.Frozen.Add(c);
+                    var periods = options.TryGetValue("periods", out var p) ? ParseInt(p, "periods", 1, 10_000) : 30;
+                    sim.Run(periods);
+                    stdout.Write(TextReport.Simulation(sim, region.Manifest));
+                    return Ok;
                 }
 
                 case "advance":

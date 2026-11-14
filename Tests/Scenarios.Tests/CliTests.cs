@@ -136,6 +136,16 @@ public sealed class CliTests : IDisposable
     }
 
     [Fact]
+    public void Simulate_command_runs_periods()
+    {
+        var r = Run("simulate", "G03", "--periods", "12", "--freeze", "carford");
+        Assert.True(r.Code == Cli.Ok, r.Err);
+        Assert.Contains("Synthetic simulation: 12 periods.", r.Out);
+        Assert.Contains("frozen", r.Out);
+        Assert.Equal(Cli.UsageOrInputError, Run("simulate", "nope").Code);
+    }
+
+    [Fact]
     public void Advance_command_moves_periods_and_freezes_inactive_cities()
     {
         var dir = Path.Combine(_temp, "G03");
