@@ -72,6 +72,11 @@
   g.city { cursor: pointer; }
   g.link { cursor: pointer; }
   .cargo { pointer-events: none; }
+  .sim-tag { background: rgba(176,124,255,.15); color: var(--air); }
+  .freeze-list { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 4px 0 8px; }
+  .freeze-list label { display: flex; gap: 5px; align-items: center; font-size: 12px; }
+  .shock { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 6px; }
+  .stale-run { color: var(--warn); font-size: 12px; margin: 6px 0; }
 </style>
 </head>
 <body>
@@ -103,6 +108,36 @@
       <h2>Policies <span class="forecast-tag">FORECAST</span></h2>
       <div id="policyControls"></div>
       <div id="policyForecast" style="margin-top:10px"></div>
+    </section>
+    <section id="timePanel">
+      <h2>Over time <span class="forecast-tag sim-tag">SIMULATION</span></h2>
+      <p class="small muted" style="margin:0 0 6px">Run the region period by period. Prices step toward what the engine says (at most 2% a period) and synthetic cities react: they buy less when steel is dear, make more when it sells well, and, with people on, hire, move and invest. Synthetic, not CS2.</p>
+      <label class="field"><span>Periods</span><input type="number" id="simPeriods" min="1" max="500" value="40"></label>
+      <label class="check"><input type="checkbox" id="simPeople"> Simulate people, jobs and businesses</label>
+      <div class="small muted">Unloaded cities (they play period 1, then their prices and figures freeze until the end):</div>
+      <div class="freeze-list" id="simFreeze"></div>
+      <details class="shock">
+        <summary>Add a change during the run</summary>
+        <label class="field"><span>In period</span><input type="number" id="shockAt" min="1" value="10"></label>
+        <label class="field"><span>World steel price (%)</span><input type="number" id="shockWorld" step="5" value="0"></label>
+        <label class="field"><span>City</span><select id="shockCity"></select></label>
+        <label class="field"><span>Its steel capacity (%)</span><input type="number" id="shockCapacity" step="5" value="0"></label>
+        <label class="field"><span>Its steel use (%)</span><input type="number" id="shockUse" step="5" value="0"></label>
+        <div class="small muted">For example world +50 for a price shock, capacity -30 for a fire, use -40 for a recession. 0 means no change.</div>
+      </details>
+      <div class="row"><button class="primary" id="simRun">Run</button>
+        <select id="simMetric">
+          <option value="buy">Buying price (applied)</option>
+          <option value="buyTarget">Buying price (target)</option>
+          <option value="sell">Selling price (applied)</option>
+          <option value="output">Steel made per day</option>
+          <option value="use">Steel used per day</option>
+          <option value="capacity">Steel capacity per day</option>
+          <option value="population">Population</option>
+          <option value="unemployment">Unemployment (%)</option>
+          <option value="commutersIn">Workers commuting in</option>
+        </select></div>
+      <div id="simResult" style="margin-top:8px"></div>
     </section>
     <section>
       <details>
@@ -189,6 +224,7 @@ async function analyze() {
   save();
   renderMap();
   renderResults();
+  renderTimeControls();
 }
 
 let analyzeTimer = 0;
@@ -203,7 +239,7 @@ function setModel(m) {
   // Maps saved before scarcity pricing existed: switch it on with the defaults.
   if (model.scarcityEnabled === undefined) { model.scarcityEnabled = true; model.scarcitySlope = 0.25; model.scarcityCap = 1; }
   for (const mode of MODES) if (!model.subsidies.some(s => s.mode === mode)) model.subsidies.push({ mode, percent: 0, budget: 5000 });
-  selected = null; linkFrom = null;
+  selected = null; linkFrom = null; sim = null; simFrozen.clear();
   renderEditor(); renderPolicyControls(); renderSettings();
   changed();
 }
@@ -732,6 +768,122 @@ $("settings").addEventListener("input", e => {
   }
   changed();
 });
+
+// ---------- over time ----------
+const SERIES = ["#4fd1c5", "#f0a03c", "#ff7ab8", "#3fa7f5", "#b07cff", "#ffe08a", "#3ecf8e", "#ff6b6b", "#a7b0bb", "#7ee0ff"];
+const METRIC_DIGITS = { buy: 2, buyTarget: 2, sell: 2, output: 0, use: 0, capacity: 0, population: 0, unemployment: 1, commutersIn: 0 };
+const PEOPLE_METRICS = new Set(["population", "unemployment", "commutersIn"]);
+let sim = null;               // { result, modelJson, frozen, shock, people }
+const simFrozen = new Set();
+
+function renderTimeControls() {
+  if (!model) return;
+  for (const id of [...simFrozen]) if (!city(id)) simFrozen.delete(id);
+  $("simFreeze").innerHTML = model.cities.length
+    ? model.cities.map(c => `<label><input type="checkbox" data-freeze="${esc(c.id)}" ${simFrozen.has(c.id) ? "checked" : ""}>${esc(c.name)}</label>`).join("")
+    : `<span class="small muted">No cities yet.</span>`;
+  const current = $("shockCity").value;
+  $("shockCity").innerHTML = `<option value="">(none)</option>` + model.cities.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
+  if (current && city(current)) $("shockCity").value = current;
+  renderTimeChart();
+}
+
+$("simFreeze").addEventListener("change", e => {
+  const id = e.target.dataset.freeze; if (!id) return;
+  if (e.target.checked) simFrozen.add(id); else simFrozen.delete(id);
+});
+
+async function runSimulation() {
+  const periods = Math.round(Number($("simPeriods").value) || 40);
+  const shock = {
+    atPeriod: Math.round(Number($("shockAt").value) || 1),
+    worldPricePercent: Number($("shockWorld").value) || 0,
+    cityId: $("shockCity").value || null,
+    capacityPercent: Number($("shockCapacity").value) || 0,
+    usePercent: Number($("shockUse").value) || 0,
+  };
+  const hasShock = shock.worldPricePercent !== 0 || shock.capacityPercent !== 0 || shock.usePercent !== 0;
+  const request = { model, periods, people: $("simPeople").checked, frozen: [...simFrozen], shock: hasShock ? shock : null };
+  $("simRun").disabled = true;
+  $("simResult").innerHTML = `<p class="small muted">Running ${periods} periods…</p>`;
+  try {
+    const result = await api("/api/simulate", request);
+    sim = { result, modelJson: JSON.stringify(model), frozen: new Set(request.frozen), shock: request.shock, people: request.people };
+  } catch (e) {
+    sim = { result: { errors: [String(e.message || e)], periods: [], metrics: {} }, frozen: new Set() };
+  } finally { $("simRun").disabled = false; }
+  renderTimeChart();
+}
+
+function renderTimeChart() {
+  const el = $("simResult");
+  if (!sim) { el.innerHTML = `<p class="small muted">Press Run to see how prices and cities move over time.</p>`; return; }
+  const r = sim.result;
+  if (r.errors?.length) { el.innerHTML = `<div class="reason" style="color:#ffc9c9">${r.errors.map(esc).join("<br>")}</div>`; return; }
+  const metric = $("simMetric").value;
+  const digits = METRIC_DIGITS[metric] ?? 2;
+  const byCity = r.metrics[metric] || {};
+  const GOODS_ONLY = new Set(["output", "capacity"]);  // a city that never makes steel has no line here
+  const ids = Object.keys(byCity).filter(id => byCity[id].some(v => v != null && (!GOODS_ONLY.has(metric) || v !== 0)));
+  const stale = sim.modelJson !== JSON.stringify(model) ? `<div class="stale-run">The map has changed since this run. Press Run again to update it.</div>` : "";
+  if (!ids.length) {
+    const why = PEOPLE_METRICS.has(metric) && !sim.people ? "Tick “Simulate people, jobs and businesses” and run again to see this." : "No city has this figure.";
+    el.innerHTML = stale + `<p class="small muted">${why}</p>`; return;
+  }
+
+  const W = 360, H = 220, L = 50, R = 10, T = 12, B = 30;
+  const n = r.periods.length;
+  const all = ids.flatMap(id => byCity[id].filter(v => v != null));
+  const min = Math.min(...all), max = Math.max(...all);
+  let lo = min, hi = max;
+  if (hi - lo < Math.max(Math.abs(hi) * 0.01, 1e-6)) { const pad = Math.max(Math.abs(hi) * 0.02, 1); lo -= pad; hi += pad; }
+  else { const pad = (hi - lo) * 0.08; lo -= pad; hi += pad; }
+  if (min >= 0 && lo < 0) lo = 0;
+  const X = i => L + (n <= 1 ? 0 : i / (n - 1)) * (W - L - R);
+  const Y = v => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+
+  const tickDigits = hi - lo < 10 ? Math.max(digits, 1) : 0;
+  let grid = [0, 0.5, 1].map(f => lo + (hi - lo) * f).map(v => `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#223040"/>
+    <text x="${L - 4}" y="${Y(v) + 4}" text-anchor="end" fill="#8b9bb0" font-size="10">${fmt(v, tickDigits)}</text>`).join("");
+  grid += [...new Set([0, Math.floor((n - 1) / 2), n - 1])]
+    .map(i => `<text x="${X(i)}" y="${H - B + 13}" text-anchor="middle" fill="#8b9bb0" font-size="10">${r.periods[i]}</text>`).join("");
+  if (sim.shock && sim.shock.atPeriod <= n) {
+    const x = X(sim.shock.atPeriod - 1);
+    grid += `<line x1="${x}" x2="${x}" y1="${T}" y2="${H - B}" stroke="#f5b84a" stroke-dasharray="3 3"/>
+      <text x="${Math.min(x + 4, W - R - 40)}" y="${T + 10}" fill="#f5b84a" font-size="10">change</text>`;
+  }
+
+  const colour = k => SERIES[k % SERIES.length];
+  const lines = ids.map((id, k) => {
+    let d = "", pen = false;
+    byCity[id].forEach((v, i) => {
+      if (v == null) { pen = false; return; }
+      d += `${pen ? "L" : "M"}${X(i).toFixed(1)},${Y(v).toFixed(1)} `; pen = true;
+    });
+    return `<path d="${d}" fill="none" stroke="${colour(k)}" stroke-width="2" ${sim.frozen.has(id) ? 'stroke-dasharray="5 4"' : ""}><title>${esc(cityName(id))}</title></path>`;
+  }).join("");
+
+  const label = $("simMetric").selectedOptions[0].textContent;
+  const chart = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(label)} over ${n} periods">
+    <rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="#0e161f" rx="4"/>
+    ${grid}${lines}
+    <text x="${(L + W - R) / 2}" y="${H - 4}" text-anchor="middle" fill="#8b9bb0" font-size="10">period</text>
+  </svg>`;
+
+  const first = id => byCity[id].find(v => v != null);
+  const last = id => [...byCity[id]].reverse().find(v => v != null);
+  const rows = ids.map((id, k) => {
+    const a = first(id), b = last(id);
+    const change = a ? (b - a) / Math.abs(a) * 100 : null;
+    return `<tr><td><i style="display:inline-block;width:10px;height:3px;background:${colour(k)};vertical-align:3px;margin-right:6px"></i>${esc(cityName(id))}${sim.frozen.has(id) ? ' <span class="muted">(unloaded)</span>' : ""}</td>
+      <td>${fmt(a, digits)}</td><td>${fmt(b, digits)}</td><td>${change == null ? "–" : (change >= 0 ? "+" : "") + fmt(change, 1) + "%"}</td></tr>`;
+  }).join("");
+  el.innerHTML = stale + chart + `<table><tr><th>City</th><th>Period 1</th><th>Period ${r.periods[n - 1]}</th><th>Change</th></tr>${rows}</table>
+    <div class="small muted" style="margin-top:6px">Dashed lines are unloaded cities. Synthetic simulation: modeled estimates, not applied to the game.</div>`;
+}
+
+$("simRun").addEventListener("click", runSimulation);
+$("simMetric").addEventListener("change", renderTimeChart);
 
 // ---------- header ----------
 async function loadScenario(name) { setModel(name === "__empty" ? await api("/api/empty") : await api(`/api/scenarios/${encodeURIComponent(name)}`)); }

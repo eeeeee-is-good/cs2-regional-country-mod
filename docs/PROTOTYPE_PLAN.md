@@ -25,7 +25,7 @@ This covers handoff gate steps 1–4 and research gates A and B. It deliberately
 | A2 Region store | Inbox ingestion with duplicate, conflict and corrupt-file handling, atomic writes, crash recovery, hash-verified reads. See [RegionStore/README.md](../RegionStore/README.md). | `regions ingest <folder>` |
 | B0 (static part) | Game 1.6.2f1 matches the research baseline; mod lifecycle and load/save signals confirmed in the game code; framework, JSON and `ModsData/` confirmed on disk. See [ASSUMPTIONS.md](ASSUMPTIONS.md). | — |
 
-Tests: 1,258 pass (Contracts 33, Engine 401, Scenarios 782, RegionStore 42), locally and in CI on three operating systems.
+Tests: 1,512 pass (Contracts 33, Engine 428, Scenarios 1,006, RegionStore 45). CI runs them on three operating systems.
 
 ### Acceptance criteria
 | # | Criterion | Status |
@@ -47,7 +47,7 @@ Tests: 1,258 pass (Contracts 33, Engine 401, Scenarios 782, RegionStore 42), loc
    - RegionStore: the net8.0 target, its extra rejection rules, and the exporter/inbox protocol question.
    - Contracts README "Open items": `MaxRegionSeqAge`, `saveLineageId`, and the `positionMetres` convention.
 5. **Optional:** G11 (50-city performance), G08 (the same city registered in two regions).
-6. **Economic model update** (2026-11-14): review and phased plan in [ECONOMIC_MODEL_PLAN.md](ECONOMIC_MODEL_PLAN.md). Phase 0 fixes three accounting inconsistencies; decisions D1–D7 come first. Nothing is implemented yet.
+6. **Economic model update** (2026-11-14): plan and progress in [ECONOMIC_MODEL_PLAN.md](ECONOMIC_MODEL_PLAN.md). **Phases 0–4 are done** (engine 0.5.0, signals, simulator goods and people dynamics, exposure report), and the sandbox can run them over time (the "Over time" panel). Still to do: Phase 5 (nominal prices and inflation; D5 undecided) and Phase 6 (game side, needs Gate C).
 
 ### To do: needs the game
 - **B0 runtime spikes + B1:** the branch is ready; it needs one in-game run.

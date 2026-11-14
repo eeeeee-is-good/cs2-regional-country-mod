@@ -21,6 +21,7 @@ app.MapGet("/api/scenarios/{name}", (string name) =>
 });
 app.MapGet("/api/empty", () => Playground.Empty());
 app.MapPost("/api/analyze", (PlaygroundModel model) => Playground.Analyze(model));
+app.MapPost("/api/simulate", (SimulationRequest request) => Playground.Simulate(request));
 
 app.Lifetime.ApplicationStarted.Register(() =>
     Console.WriteLine($"Regions Sandbox is running. Open {string.Join(", ", app.Urls)} in your browser. Press Ctrl+C to stop."));
