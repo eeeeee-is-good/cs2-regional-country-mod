@@ -47,6 +47,7 @@ Tests: 1,258 pass (Contracts 33, Engine 401, Scenarios 782, RegionStore 42), loc
    - RegionStore: the net8.0 target, its extra rejection rules, and the exporter/inbox protocol question.
    - Contracts README "Open items": `MaxRegionSeqAge`, `saveLineageId`, and the `positionMetres` convention.
 5. **Optional:** G11 (50-city performance), G08 (the same city registered in two regions).
+6. **Economic model update** (2026-11-14): review and phased plan in [ECONOMIC_MODEL_PLAN.md](ECONOMIC_MODEL_PLAN.md). Phase 0 fixes three accounting inconsistencies; decisions D1–D7 come first. Nothing is implemented yet.
 
 ### To do: needs the game
 - **B0 runtime spikes + B1:** the branch is ready; it needs one in-game run.
