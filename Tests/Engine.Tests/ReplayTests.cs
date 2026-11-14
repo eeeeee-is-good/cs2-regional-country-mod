@@ -30,7 +30,7 @@ public class ReplayTests
     }
 
     private const string PinnedGoldenInputsSha256 = "75fa2a07ecf5525ae2176616f8257765a23a0f77cac3cc0f5c412ead9f952612";
-    private const string PinnedGoldenQuoteSha256 = "e2a35c1f9a6eae64565135acfb6f1e07f2364c7c10c9669c7fcd07ccb8aa48c2";
+    private const string PinnedGoldenQuoteSha256 = "cafeda5a816aad0ab0548c17206183e46390ece8283ba0c95bd96db8fa0effb2";
 
     [Fact]
     public void Input_order_does_not_change_a_single_byte()

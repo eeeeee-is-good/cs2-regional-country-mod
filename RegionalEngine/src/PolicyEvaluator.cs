@@ -38,7 +38,8 @@ namespace Regions.Engine
     ///
     /// Route choice uses unsubsidized freight: a subsidy lowers the price on the path that is physically cheapest;
     /// it never makes the engine pick a different path. Budget scaling is region-wide and deterministic:
-    ///   exposure(policy) = sum over supplier cities s (sorted) of effectiveOffer(s) x max over destinations d of subsidyPerUnit(s -> d)
+    ///   exposure(policy) = sum over supplier cities s (sorted) of sold(s) x max over destinations d of subsidyPerUnit(s -> d)
+    ///   sold(s) = min(effectiveOffer(s), total need of the cities it reaches); effectiveOffer(s) if any of their needs is unknown
     ///   scale = exposure &lt;= budget ? 1 : budget / exposure
     /// so the forecast spend never exceeds the budget, and a zero budget stops the subsidy (G09).
     /// Each supplier's offer is counted once, at its best rate: an upper bound, because a surplus cannot be sold twice.
@@ -90,6 +91,16 @@ namespace Regions.Engine
             var maxAge = m.Parameters.Staleness.MaxRegionSeqAge;
             var cityIds = m.Cities.Select(c => c.CityId).OrderBy(x => x, StringComparer.Ordinal).ToList();
 
+            // Each destination's need (D1-weighted deficit); null = unknown.
+            var need = new Dictionary<string, double?>(StringComparer.Ordinal);
+            foreach (var id in cityIds)
+            {
+                if (!latest.TryGetValue(id, out var p)) { need[id] = 0; continue; }
+                var o = p.Snapshot.Resources.FirstOrDefault(r => string.Equals(r.ResourceId, s.ResourceId, StringComparison.Ordinal));
+                var w = Freshness.Weight(state, p);
+                need[id] = o == null || w <= 0 ? 0 : DemandRule.Deficit(o) * w;
+            }
+
             var exposure = 0.0;
             foreach (var supplier in cityIds)
             {
@@ -97,18 +108,26 @@ namespace Regions.Engine
                 if (maxAge != null && state.CurrentRegionSeq - pub.RegionSeq > maxAge.Value) continue;
                 var obs = pub.Snapshot.Resources.FirstOrDefault(r => string.Equals(r.ResourceId, s.ResourceId, StringComparison.Ordinal));
                 if (obs == null) continue;
-                var supply = SupplyRule.Evaluate(obs);
+                var supply = SupplyRule.Evaluate(obs, Freshness.Weight(state, pub));
                 if (supply.ExcludedReason != null || supply.EffectiveOfferPerGameDay is not double effective) continue;
 
+                // A supplier can only sell what the cities it reaches need (Phase 0, docs/ECONOMIC_MODEL_PLAN.md §4.3).
+                // When any reachable city's need is unknown, assume it could take the whole offer (the old, cautious bound).
                 var best = 0.0;
+                double reachableNeed = 0;
+                var unknownNeed = false;
                 foreach (var dest in cityIds)
                 {
                     if (string.Equals(dest, supplier, StringComparison.Ordinal)) continue;
                     var route = graph.Cheapest(supplier, dest, resource.AllowedFreightModes);
                     if (route == null) continue;
+                    var n = need[dest];
+                    if (n == 0) continue; // a city that needs nothing cannot receive subsidised steel
+                    if (n == null) unknownNeed = true; else reachableNeed += n.Value;
                     best = Math.Max(best, SubsidyPerUnit(s, route.LinkIds, links, costs));
                 }
-                exposure += effective * best;
+                var sold = unknownNeed ? effective : Math.Min(effective, reachableNeed);
+                exposure += sold * best;
             }
 
             if (!Num.IsFinite(exposure))

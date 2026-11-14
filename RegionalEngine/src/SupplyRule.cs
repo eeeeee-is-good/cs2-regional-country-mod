@@ -49,7 +49,8 @@ namespace Regions.Engine
         public const double MissingInputUsePenalty = 0.5;
         public const double MissingCapacityPenalty = 0.5;
 
-        public static SupplyAssessment Evaluate(ResourceObservation o)
+        /// <param name="freshness">D1 ageing weight (Freshness.Weight), 1 for a fresh snapshot.</param>
+        public static SupplyAssessment Evaluate(ResourceObservation o, double freshness = 1.0)
         {
             var notes = new List<string>();
 
@@ -82,6 +83,12 @@ namespace Regions.Engine
             {
                 factor *= MissingCapacityPenalty;
                 notes.Add(FormattableString.Invariant($"capacity unknown x{MissingCapacityPenalty:0.##}"));
+            }
+
+            if (freshness < 1)
+            {
+                factor *= freshness;
+                notes.Add(FormattableString.Invariant($"ageing snapshot x{freshness:0.##}"));
             }
 
             var effective = baseOffer * factor;

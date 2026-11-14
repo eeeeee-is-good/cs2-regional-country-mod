@@ -161,12 +161,13 @@ public static class Playground
             foreach (var c in model.Cities)
             {
                 var analysis = new CityAnalysis { Quote = engine.Quote(state, new QuoteRequest { DestCityId = c.Id, ResourceId = Resource }) };
-                var obs = state.LatestSnapshots.First(p => p.Snapshot.CityId == c.Id).Snapshot.Resources.FirstOrDefault();
+                var pub = state.LatestSnapshots.First(p => p.Snapshot.CityId == c.Id);
+                var obs = pub.Snapshot.Resources.FirstOrDefault();
                 if (obs != null)
                 {
-                    if (obs.Confidence != Confidence.Unknown && obs.RealizedOutputPerGameDay is double output && obs.InputUsePerGameDay is double use)
-                        analysis.Demand = Math.Max(0, use - output);
-                    var supply = SupplyRule.Evaluate(obs);
+                    var weight = Freshness.Weight(state, pub);
+                    analysis.Demand = (DemandRule.Deficit(obs) ?? 0) * weight;
+                    var supply = SupplyRule.Evaluate(obs, weight);
                     analysis.EffectiveOffer = supply.EffectiveOfferPerGameDay;
                     analysis.SupplyExcluded = supply.ExcludedReason;
                     analysis.SupplyNotes = supply.Notes;

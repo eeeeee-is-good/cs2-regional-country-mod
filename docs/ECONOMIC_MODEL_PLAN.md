@@ -4,6 +4,24 @@
 **Input:** "Regional Country Mod — Economic Model Design Update" (supply, demand and pricing; elasticity; unloaded cities; population and business feedback; inflation).
 **Reviewed against:** engine 0.4.0 on `main`, ARCHITECTURE.md, Contracts/README.md, and research log §8A, §14.4–14.5, §16, §17, §19.8, §22.4–22.5 and §26.
 
+## Progress
+
+The developer asked for Phases 0–4 to be built, with the decisions below taken as recommended. Phase 5 (nominal) and Phase 6 (game side) are not started.
+
+| Phase | Status |
+|---|---|
+| 0. Consistency fixes | **Done**, engine 0.5.0: D1 ageing on both sides (`Freshness.cs`); D2 documented (`DemandRule`); demand-aware subsidy exposure. |
+| 1–4 | In progress (see the sections below as each lands). |
+
+**Decisions taken:**
+- **D1:** fade supply and demand together. Full weight to half the limit, linear to 0 beyond it.
+- **D2:** demand is not discounted for Provisional figures (documented).
+- **D3:** applied prices step at most 2% of the regional producer price per period. There is no band in the engine; the ±band belongs to the in-game modifier at Gate C.
+- **D4:** a period is an explicit region tick, never a city clock.
+- **D5:** undecided (Phase 5).
+- **D6:** 3 qualification groups.
+- **D7:** commuting stays in the simulator first.
+
 The guiding principle stays the same: **the regional engine simulates relationships between cities; Cities: Skylines II simulates what happens inside each active city.** Every recommendation below follows from it.
 
 ---

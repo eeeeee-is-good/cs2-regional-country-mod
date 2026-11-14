@@ -21,8 +21,9 @@ namespace Regions.Engine
     /// </summary>
     public sealed class LandedCostEngine : IRegionalEngine
     {
-        /// <summary>0.2.0: A4 supply rule. 0.3.0: A7 tariffs and subsidies. 0.4.0: optional scarcity pricing.</summary>
-        public const string EngineVersion = "0.4.0";
+        /// <summary>0.2.0: A4 supply rule. 0.3.0: A7 tariffs and subsidies. 0.4.0: optional scarcity pricing.
+        /// 0.5.0: D1 ageing of supply and demand; demand-aware subsidy forecast.</summary>
+        public const string EngineVersion = "0.5.0";
 
         private static readonly TransportMode[] AllModes =
             (TransportMode[])System.Enum.GetValues(typeof(TransportMode));
@@ -137,7 +138,7 @@ namespace Regions.Engine
 
             if (ctx.IsStale(pub)) return Exclude(offer, ExcludedReason.StaleSnapshot);
 
-            var supply = SupplyRule.Evaluate(obs);
+            var supply = SupplyRule.Evaluate(obs, ctx.FreshnessOf(pub));
             offer.EffectiveRegionalOfferPerGameDay = supply.EffectiveOfferPerGameDay;
             if (supply.ExcludedReason != null) return Exclude(offer, supply.ExcludedReason.Value);
 
@@ -249,6 +250,9 @@ namespace Regions.Engine
             var maxAge = Manifest.Parameters.Staleness.MaxRegionSeqAge;
             return maxAge != null && State.CurrentRegionSeq - pub.RegionSeq > maxAge.Value;
         }
+
+        /// <summary>D1 ageing weight of a snapshot: 1 while fresh, falling to 0 at the staleness limit.</summary>
+        public double FreshnessOf(PublishedSnapshot pub) => Freshness.Weight(State, pub);
 
         /// <summary>Cheapest freight path in a mode allowed for the resource (cached). null when none or the resource is unknown.</summary>
         public Route? RouteBetween(string from, string to)
