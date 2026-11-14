@@ -108,6 +108,42 @@ public class SimulationTests
         Assert.Equal(140, BuyApplied(sim, "carford")[^1], 6);           // recovers to the ceiling
     }
 
+    /// <summary>
+    /// Long-unloaded city (§7): Carford is away for 30 periods while the world price rises 20%. Its applied price must
+    /// stay frozen; once the other cities have published enough, its old snapshot ages out on both sides (D1); the
+    /// exposure report says what it will meet; and on return its price moves at most one step per period.
+    /// </summary>
+    [Fact]
+    public void Long_unloaded_city_freezes_ages_out_and_returns_gradually()
+    {
+        var sim = Sim("corridor", s => s.Manifest.Parameters.Staleness.MaxRegionSeqAge = 40);
+        sim.Run(5);
+        var appliedWhenLeft = sim.History[^1].Of("carford").BuyApplied!.Value;
+
+        sim.Frozen.Add("carford");
+        sim.Scenario.Manifest.Parameters.ResourcePrices.Single().WorldProducerPriceIndex = 128 * 1.2;
+        sim.Run(30);
+        Assert.All(sim.History.Skip(5), r => Assert.Equal(appliedWhenLeft, r.Of("carford").BuyApplied));
+        Assert.All(sim.History.Skip(5), r => Assert.True(r.Of("carford").Frozen));
+
+        // Three active cities publish every period: Carford's snapshot is now 90 ingestions old (> 40), so it is stale
+        // and its demand no longer presses on Ironvale.
+        var state = sim.Scenario.ToState();
+        var engine = new LandedCostEngine();
+        Assert.DoesNotContain(engine.Markets(state, "Steel").SelectMany(m => m.Buyers), b => b.CityId == "carford");
+
+        var exposure = ExposureReport.Build(state, sim.Signals!, sim.SignalRule).Single(e => e.CityId == "carford");
+        Assert.Equal("Forecast", exposure.ReportedAs);
+        Assert.Equal(0, exposure.Freshness);
+        Assert.Equal(appliedWhenLeft, exposure.AppliedNow);
+
+        sim.Frozen.Remove("carford");                                  // loaded again
+        sim.Run(30);
+        var after = sim.History.Skip(34).Select(r => r.Of("carford").BuyApplied!.Value).ToArray();
+        AssertStepsAtMost(after, 2);                                   // no jump on return, no backlog
+        Assert.Equal(sim.History[^1].Of("carford").BuyTarget!.Value, after[^1], 6);
+    }
+
     [Fact]
     public void Engine_demand_stays_vertical()
     {

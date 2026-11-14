@@ -117,6 +117,19 @@ public static class TextReport
         return sb.ToString();
     }
 
+    public static string Exposure(IReadOnlyList<CityExposure> report, RegionManifest manifest)
+    {
+        var names = manifest.Cities.ToDictionary(c => c.CityId, c => string.IsNullOrEmpty(c.DisplayName) ? c.CityId : c.DisplayName);
+        var sb = new StringBuilder();
+        sb.Append("FORECAST: what each city will meet when it is next loaded. Not applied, and never used as an input.\n");
+        foreach (var e in report)
+            sb.Append("  ").Append(names.TryGetValue(e.CityId, out var n) ? n : e.CityId).Append(" (").Append(e.ResourceId)
+              .Append(", snapshot age ").Append(e.SnapshotAge).Append(", weight ").Append(e.Freshness.ToString("0.##", CultureInfo.InvariantCulture))
+              .Append("): ").Append(e.Summary).Append(". Price then ").Append(N(e.PriceAtLastPublish))
+              .Append(", applied ").Append(N(e.AppliedNow)).Append(", target ").Append(N(e.TargetNow)).Append(".\n");
+        return sb.ToString();
+    }
+
     public static string Signals(SignalState s, RegionManifest manifest)
     {
         var names = manifest.Cities.ToDictionary(c => c.CityId, c => string.IsNullOrEmpty(c.DisplayName) ? c.CityId : c.DisplayName);

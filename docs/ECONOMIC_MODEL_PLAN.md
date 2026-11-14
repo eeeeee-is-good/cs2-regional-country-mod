@@ -13,7 +13,8 @@ The developer asked for Phases 0–4 to be built, with the decisions below taken
 | 0. Consistency fixes | **Done**, engine 0.5.0: D1 ageing on both sides (`Freshness.cs`); D2 documented (`DemandRule`); demand-aware subsidy exposure. |
 | 1. Time and gradual signals | **Done:** `SignalPlanner` (target vs applied, D3 step, frozen when inactive, reference price for Phase 3), `FileRegionStore.AdvancePeriod` with `signals/state.json`, `regions advance`. A price cache was not needed: a full region quote takes milliseconds; revisit with G11. |
 | 2. Simulator goods dynamics | **Done:** `CityGoods` (fixed elasticities by class: essential 0.2, discretionary 0.8, industrial 0; supply elasticity 0.6 below capacity; lag 0.3; output step at most 10% of capacity) and `RegionSimulation` (engine → applied signals → reactions → republished snapshots); `regions simulate`. Tests: quiet region settles, world price shock up and back, supply shock up to the world ceiling, recession and recovery, vertical engine demand guard, determinism, and 100 random regions × 60 periods with no growing oscillation. |
-| 3–4 | In progress. |
+| 3. Unloaded cities | **Done:** D1 ageing (Phase 0) plus `ExposureReport` (forecast only: change since last publish, gap, periods to converge; never an input) and `regions exposure`. Tests: report values and wording, building it changes nothing, and a simulated city away for 30 periods during a world price rise stays frozen, ages out on both sides, and returns at most one step per period. Offline business closures and entries are deliberately not estimated. |
+| 4 | In progress. |
 
 **Decisions taken:**
 - **D1:** fade supply and demand together. Full weight to half the limit, linear to 0 beyond it.
