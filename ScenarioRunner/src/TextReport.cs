@@ -87,6 +87,34 @@ public static class TextReport
         return sb.ToString();
     }
 
+    public static string Signals(SignalState s, RegionManifest manifest)
+    {
+        var names = manifest.Cities.ToDictionary(c => c.CityId, c => string.IsNullOrEmpty(c.DisplayName) ? c.CityId : c.DisplayName);
+        var sb = new StringBuilder();
+        sb.Append("Region period ").Append(s.Period).Append(". Target = engine quote now; applied = what the city feels, moving gradually.\n");
+        var rows = new List<string[]> { new[] { "City", "Resource", "Buy target", "Buy applied", "Status", "Sell target", "Sell applied", "Status" } };
+        foreach (var x in s.Signals)
+            rows.Add(new[]
+            {
+                names.TryGetValue(x.CityId, out var n) ? n : x.CityId, x.ResourceId,
+                N(x.Buy.Target), N(x.Buy.Applied), x.Buy.Status.ToString(),
+                N(x.Sell.Target), N(x.Sell.Applied), x.Sell.Status.ToString(),
+            });
+        var widths = Enumerable.Range(0, rows[0].Length).Select(c => rows.Max(r => r[c].Length)).ToArray();
+        var numeric = new HashSet<int> { 2, 3, 5, 6 };
+        foreach (var r in rows)
+        {
+            sb.Append("  ");
+            for (var c = 0; c < r.Length; c++)
+            {
+                var cell = c == r.Length - 1 ? r[c] : numeric.Contains(c) ? r[c].PadLeft(widths[c]) : r[c].PadRight(widths[c]);
+                sb.Append(cell).Append(c == r.Length - 1 ? "" : "  ");
+            }
+            sb.Append('\n');
+        }
+        return sb.ToString();
+    }
+
     public static string Policies(IReadOnlyList<PolicyForecast> forecasts, RegionManifest manifest)
     {
         var sb = new StringBuilder();

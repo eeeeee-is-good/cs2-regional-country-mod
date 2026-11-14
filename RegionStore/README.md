@@ -8,6 +8,7 @@ The region's external store: one folder per region, outside any save (ARCHITECTU
   inbox/<cityId>.<seq>.json      created by exporters; never modified by the store
   snapshots/index.json           written only by the store, atomically
   snapshots/<cityId>/<seq>.json  accepted snapshots, byte-for-byte copies; immutable
+  signals/state.json             applied price state per city and resource (Phase 1); replaced atomically
 ```
 
 ## Ingestion (`FileRegionStore.IngestInbox`)

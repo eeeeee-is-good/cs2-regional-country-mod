@@ -29,6 +29,28 @@ public sealed class FileRegionStore
     public string InboxDirectory => Path.Combine(Root, "inbox");
     public string SnapshotPath(string cityId, int seq) => Path.Combine(Root, "snapshots", cityId, seq.ToString(CultureInfo.InvariantCulture) + ".json");
     public string InboxPath(string cityId, int seq) => Path.Combine(InboxDirectory, $"{cityId}.{seq.ToString(CultureInfo.InvariantCulture)}.json");
+    /// <summary>Applied price state (Phase 1). Store-internal; not a Contracts document yet (the mod reads it from Gate C).</summary>
+    public string SignalsPath => Path.Combine(Root, "signals", "state.json");
+
+    /// <summary>The applied price state, or null before the first period.</summary>
+    public SignalState? ReadSignals()
+    {
+        if (!File.Exists(SignalsPath)) return null;
+        try { return ContractJson.FromBytes<SignalState>(File.ReadAllBytes(SignalsPath)); }
+        catch (System.Text.Json.JsonException ex) { throw new StoreCorruptException($"{SignalsPath}: {ex.Message}"); }
+    }
+
+    /// <summary>
+    /// Advances the region one period (D4: an explicit tick): every active city's applied prices step toward the current
+    /// targets; inactive cities stay frozen. Written atomically. Re-running with the same snapshots and the same previous
+    /// state gives the same result.
+    /// </summary>
+    public SignalState AdvancePeriod(IEnumerable<ResourceDefinition> resources, SignalRule rule, ISet<string>? active = null)
+    {
+        var next = SignalPlanner.Step(ReadSignals(), LoadState(resources), new LandedCostEngine(), rule, active);
+        ContractFiles.AtomicReplace(SignalsPath, ContractJson.ToBytes(next));
+        return next;
+    }
 
     /// <summary>Opens an existing store. Read-only until a write method is called.</summary>
     public static FileRegionStore Open(string root)

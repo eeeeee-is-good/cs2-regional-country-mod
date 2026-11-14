@@ -25,6 +25,10 @@ public static class Cli
           regions check <folder>                Quote everything and check the log §18.4 invariants.
           regions ingest <folder>               Accept new snapshot files from <folder>/inbox and report conflicts.
           regions policies <folder>             Forecast of every tariff and subsidy: exposure, budget, scale.
+          regions advance <folder> [options]    Move the region forward: applied prices step toward the targets.
+            --periods <n>                         How many periods (default 1).
+            --inactive <city,city>                Unloaded cities: their applied prices stay frozen.
+            --step <fraction>                     Largest move per period, share of the producer price (default 0.02).
 
           --resources <file>                    Resource table to use (default: the bundled resource-ids.v1.json).
 
@@ -80,6 +84,25 @@ public static class Cli
                     var report = new LandedCostEngine().Check(state);
                     stdout.Write(TextReport.Check(report, state.Manifest));
                     return report.Passed ? Ok : CheckFailed;
+                }
+
+                case "advance":
+                {
+                    Require(positional, 2, "regions advance <folder>");
+                    var store = FileRegionStore.Open(positional[1]);
+                    var resources = ResourceTable.Load(options.GetValueOrDefault("resources"));
+                    var periods = options.TryGetValue("periods", out var n) ? ParseInt(n, "periods", 1, 10_000) : 1;
+                    var rule = new SignalRule();
+                    if (options.TryGetValue("step", out var stepText)) rule.MaxStepFraction = ParseDouble(stepText, "step");
+                    var inactive = options.TryGetValue("inactive", out var list)
+                        ? new HashSet<string>(list.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), StringComparer.Ordinal)
+                        : new HashSet<string>(StringComparer.Ordinal);
+                    var manifest = store.ReadManifest();
+                    var active = new HashSet<string>(manifest.Cities.Select(c => c.CityId).Where(id => !inactive.Contains(id)), StringComparer.Ordinal);
+                    SignalState? last = null;
+                    for (var i = 0; i < periods; i++) last = store.AdvancePeriod(resources, rule, active);
+                    stdout.Write(TextReport.Signals(last!, manifest));
+                    return Ok;
                 }
 
                 case "policies":
@@ -139,7 +162,21 @@ public static class Cli
         if (positional.Count < count) throw new UsageException($"usage: {usage}");
     }
 
-    private static readonly HashSet<string> KnownOptions = new() { "dest", "resource", "json", "resources" };
+    private static readonly HashSet<string> KnownOptions = new() { "dest", "resource", "json", "resources", "periods", "inactive", "step", "freeze" };
+
+    private static int ParseInt(string text, string name, int min, int max)
+    {
+        if (!int.TryParse(text, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var v) || v < min || v > max)
+            throw new UsageException($"--{name} must be a whole number from {min} to {max}");
+        return v;
+    }
+
+    private static double ParseDouble(string text, string name)
+    {
+        if (!double.TryParse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) || !double.IsFinite(v) || v < 0)
+            throw new UsageException($"--{name} must be a number >= 0");
+        return v;
+    }
 
     private static (List<string>, Dictionary<string, string>) Parse(string[] args)
     {
