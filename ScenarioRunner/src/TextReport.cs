@@ -16,7 +16,8 @@ public static class TextReport
         {
             var obs = state.LatestSnapshots.FirstOrDefault(p => p.Snapshot.CityId == o.OriginCityId)?
                 .Snapshot.Resources.FirstOrDefault(r => r.ResourceId == q.ResourceId);
-            var notes = obs == null ? new List<string>() : SupplyRule.Evaluate(obs).Notes;
+            var pub = state.LatestSnapshots.FirstOrDefault(p => p.Snapshot.CityId == o.OriginCityId);
+            var notes = obs == null || pub == null ? new List<string>() : SupplyRule.Evaluate(obs, Freshness.Weight(state, pub)).Notes;
             return notes.Count == 0 ? "" : " (" + string.Join(", ", notes) + ")";
         }
         string Name(string? id) => id != null && names.TryGetValue(id, out var n) ? n : id ?? "?";

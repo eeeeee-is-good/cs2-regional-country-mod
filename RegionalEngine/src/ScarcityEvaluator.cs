@@ -115,13 +115,13 @@ namespace Regions.Engine
                 if (!ctx.Latest.TryGetValue(id, out var pub)) continue;
                 var obs = ctx.Observation(pub);
                 if (obs == null) continue;
-                if (!ctx.IsStale(pub))
-                {
-                    var supply = SupplyRule.Evaluate(obs);
-                    if (supply.ExcludedReason == null && supply.EffectiveOfferPerGameDay is double e && e > 0) spare[id] = e;
-                }
-                if (obs.Confidence != Confidence.Unknown && obs.RealizedOutputPerGameDay is double output && obs.InputUsePerGameDay is double use && use > output)
-                    buyers.Add(new Buyer(id, use - output));
+                // D1: supply and demand age together. A stale snapshot (weight 0) counts on neither side.
+                var weight = ctx.FreshnessOf(pub);
+                if (weight <= 0) continue;
+                var supply = SupplyRule.Evaluate(obs, weight);
+                if (supply.ExcludedReason == null && supply.EffectiveOfferPerGameDay is double e && e > 0) spare[id] = e;
+                if (DemandRule.Deficit(obs) is double deficit && deficit > 0)
+                    buyers.Add(new Buyer(id, deficit * weight));
             }
             if (spare.Count == 0) return Array.Empty<SupplierMarket>();
 

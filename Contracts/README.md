@@ -80,7 +80,7 @@ Hashes are lowercase hex SHA-256 of the **exact file bytes**. Hashing happens at
   - **Import tariff** (at most one per resource): `tariff = worldProducerPrice × adValoremPercent / 100 + specificPerUnit` on world offers.
   - **Freight subsidy** (at most one per resource and mode): `percentOfFreight` of the freight on qualifying links of the path (that mode; `linkIds`, or all links of the mode when null), times a budget scale. The subsidy is never more than the freight.
   - **Path choice** uses unsubsidised freight: a subsidy lowers the price on the physically cheapest path; it does not change which path is used.
-  - **Budget scale** (region-wide, deterministic): `exposure = Σ over supplier cities of effectiveOffer × best subsidy per unit to any destination`; `scale = exposure ≤ budget ? 1 : budget / exposure`. A zero budget stops the subsidy. Because the budget is shared, a supplier elsewhere can dilute a subsidy. This is the one intended link between otherwise separate quotes, and `regions policies` shows it.
+  - **Budget scale** (region-wide, deterministic): `exposure = Σ over supplier cities of sold × best subsidy per unit to any destination that needs steel`, where `sold = min(effectiveOffer, total need of the cities it reaches)` (engine 0.5.0), or the whole effective offer when any of those needs is unknown; `scale = exposure ≤ budget ? 1 : budget / exposure`. A zero budget stops the subsidy. Because the budget is shared, a supplier elsewhere can dilute a subsidy. This is the one intended link between otherwise separate quotes, and `regions policies` shows it.
   - Exposure and spend are **forecasts**, never cash. Tariff revenue is not estimated, because import volumes are not tracked (D-42).
 - **Scarcity pricing** (engine 0.4.0, `parameters.scarcity`, optional within v1; null or absent means off, so suppliers sell any quantity at their base price). See `RegionalEngine/src/ScarcityEvaluator.cs`.
   - Every eligible supplier is a small supply/demand market at its gate (log §16.3 caveat, §17.4 step 4).
@@ -106,12 +106,13 @@ Hashes are lowercase hex SHA-256 of the **exact file bytes**. Hashing happens at
   - `inputUse` null → the surplus is unknown, so `output` replaces `output − inputUse`, with a ×0.5 penalty.
   - `capacity` null → no capacity cap, with a ×0.5 penalty.
   - Result ≤ 0 → `NoSupply`. `UnknownSupply` takes precedence over `NoSupply`.
-  - In v1 this quantity only decides eligibility and is reported; it never changes a price. So there is no age decay: staleness is the `maxRegionSeqAge` cut-off.
+  - **Ageing (D1, engine 0.5.0):** an ageing snapshot fades on both sides, supply and demand. With `age = currentRegionSeq − regionSeq`: full weight while `age ≤ maxRegionSeqAge / 2`, then linearly down, and 0 beyond `maxRegionSeqAge` (`StaleSnapshot`). The effective offer and a city's demand are both multiplied by this weight. A stale city counts on neither side. See `RegionalEngine/src/Freshness.cs`.
+  - **Demand (D2):** a city's demand is `inputUse − output` when both are measured and confidence is not `Unknown`. It is deliberately **not** discounted for `Provisional` figures. Counting uncertain need in full errs toward "scarce", the safer side for a mod that may later nudge prices.
 - `selectedOfferIndex` points to the lowest eligible `landedPrice`; a tie goes to the earlier offer. It is `null` when nothing is eligible.
 - Offer order: City offers by `originCityId`, then World offers by gateway `endpointKey`.
 
 ## Open items to settle in review
 
-- ~~Whether `MaxRegionSeqAge` is the right rule.~~ **Kept in A4 (2026-11-06):** it is the only staleness signal that never compares independent city clocks. Revisit if quantities start to affect prices (then add age decay to the effective offer).
+- ~~Whether `MaxRegionSeqAge` is the right rule.~~ **Kept in A4 (2026-11-06):** it is the only staleness signal that never compares independent city clocks. Revisit if quantities start to affect prices (then add age decay to the effective offer). **Done in engine 0.5.0 (D1):** quantities now affect prices through scarcity, so ageing fades supply and demand together.
 - Whether `CitySnapshot` needs `saveLineageId` before V-15 is verified. Currently it doesn't; lineage is checked through `seq`/`parentSeq`/`gameDays`.
 - The coordinate convention of `positionMetres` (V-28). Golden values assume map-centred x/z with y up, and that is a guess.

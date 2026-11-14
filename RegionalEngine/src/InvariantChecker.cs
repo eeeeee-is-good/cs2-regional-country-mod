@@ -206,9 +206,11 @@ namespace Regions.Engine
                 if (MarketLayer(q2) != MarketLayer(q))
                     fail(GraphIsolation, $"boosting unreachable supplier {o.OriginCityId} changed the quote");
                 if (state.Manifest.Parameters.Scarcity != null) continue;
+                // Compared before buyer support: the counterfactual also changes the boosted city's own need, which
+                // re-scales shared subsidy budgets in either direction (deliberate budget coupling, not a leak).
                 for (var i = 0; i < Math.Min(q.Offers.Count, q2.Offers.Count); i++)
                     if (q.Offers[i].Eligible && q2.Offers[i].Eligible
-                        && q2.Offers[i].LandedPrice < q.Offers[i].LandedPrice - Tolerance(q.Offers[i].LandedPrice!.Value))
+                        && Before(q2.Offers[i]) < Before(q.Offers[i]) - Tolerance(Before(q.Offers[i])))
                         fail(GraphIsolation, $"boosting unreachable supplier {o.OriginCityId} made offer {i} cheaper");
             }
         }
@@ -353,6 +355,9 @@ namespace Regions.Engine
         /// scarcity premium (step 4). Scarcity and shared subsidy budgets are deliberate region-wide couplings, so the
         /// isolation (#1) and route (#3) rules are checked on this layer, as log §18.4 #3 prescribes ("policies held fixed").
         /// </summary>
+        /// <summary>Landed price before buyer/logistics support (subsidy added back), scarcity included.</summary>
+        private static double Before(Offer o) => o.LandedPrice!.Value + (o.Subsidy ?? 0);
+
         private static double PreSupport(Offer o) => o.ProducerPrice!.Value + o.Freight!.Value + o.Tariff!.Value;
 
         /// <summary>The market layer only: everything except the budget-dependent subsidy and the selection it can move.</summary>
