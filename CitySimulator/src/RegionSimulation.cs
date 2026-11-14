@@ -19,6 +19,12 @@ namespace Regions.Simulator
         public double Output { get; set; }
         public double Use { get; set; }
         public double Capacity { get; set; }
+        // Phase 4 (null without people)
+        public double? Population { get; set; }
+        public double? UnemploymentRate { get; set; }
+        public double? Vacancies { get; set; }
+        public double? CommutersOut { get; set; }
+        public double? CommutersIn { get; set; }
     }
 
     public sealed class PeriodRecord
@@ -57,6 +63,9 @@ namespace Regions.Simulator
         public HashSet<string> Frozen { get; } = new HashSet<string>(StringComparer.Ordinal);
         public SignalState? Signals { get; private set; }
         public List<PeriodRecord> History { get; } = new List<PeriodRecord>();
+        /// <summary>Phase 4 synthetic people per city (empty unless PeopleDynamics.Attach was called).</summary>
+        public SortedDictionary<string, CityPeople> People { get; } = new SortedDictionary<string, CityPeople>(StringComparer.Ordinal);
+        public PeopleRule? PeopleRule { get; set; }
         /// <summary>Phase 4 hook: called once per period after goods react, before publishing.</summary>
         public Action<RegionSimulation, int>? AfterGoods { get; set; }
 
@@ -79,6 +88,7 @@ namespace Regions.Simulator
                         Capacity = obs.CapacityEstimatePerGameDay ?? output, BaseOutput = output, Output = output,
                         IndustrialUse = use * industrialShare,
                         BaseConsumerUse = use * (1 - industrialShare), ConsumerUse = use * (1 - industrialShare),
+                        InitialConsumerUse = use * (1 - industrialShare),
                         ConsumerClass = consumerClass,
                     };
                 }
@@ -108,6 +118,7 @@ namespace Regions.Simulator
                 g.Step(s?.Buy.Applied, s?.Sell.Applied, basePrice, GoodsRule);
             }
 
+            if (People.Count > 0) PeopleDynamics.Step(this, active);
             AfterGoods?.Invoke(this, Signals.Period);
 
             foreach (var city in cities.Where(active.Contains)) Republish(city);
@@ -121,6 +132,9 @@ namespace Regions.Simulator
                     CityId = g.CityId, ResourceId = g.ResourceId, Frozen = !active.Contains(g.CityId),
                     BuyTarget = s?.Buy.Target, BuyApplied = s?.Buy.Applied, SellTarget = s?.Sell.Target, SellApplied = s?.Sell.Applied,
                     Output = g.Output, Use = g.TotalUse, Capacity = g.Capacity,
+                    Population = People.TryGetValue(g.CityId, out var p) ? p.TotalPopulation : (double?)null,
+                    UnemploymentRate = p?.UnemploymentRate, Vacancies = p?.Vacancies.Sum(),
+                    CommutersOut = p?.CommutersOut, CommutersIn = p?.CommutersIn,
                 });
             }
             History.Add(record);

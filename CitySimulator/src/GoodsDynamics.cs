@@ -50,12 +50,16 @@ namespace Regions.Simulator
 
         /// <summary>Most it can produce. Output never exceeds it.</summary>
         public double Capacity { get; set; }
+        /// <summary>Phase 4: the most capacity the city's industrial buildings can hold. 0 = not modelled.</summary>
+        public double SpaceCapacity { get; set; }
         /// <summary>Output when it sells at the base price.</summary>
         public double BaseOutput { get; set; }
         public double Output { get; set; }
 
         /// <summary>Price-sensitive use (households, shops) at the reference price.</summary>
         public double BaseConsumerUse { get; set; }
+        /// <summary>BaseConsumerUse at the start; Phase 4 scales it with the city's spending power.</summary>
+        public double InitialConsumerUse { get; set; }
         public DemandClass ConsumerClass { get; set; } = DemandClass.Discretionary;
         public double ConsumerUse { get; set; }
         /// <summary>Use that follows production, not price (industrial inputs).</summary>

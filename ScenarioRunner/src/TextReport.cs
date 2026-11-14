@@ -93,17 +93,32 @@ public static class TextReport
         var sb = new StringBuilder();
         sb.Append("Synthetic simulation: ").Append(sim.History.Count).Append(" periods. Cities react to applied prices (simulator only, not CS2).\n");
         var every = Math.Max(1, sim.History.Count / 10);
-        var rows = new List<string[]> { new[] { "Period", "City", "Buy (target)", "Sell (target)", "Output", "Use", "Capacity", "" } };
+        var people = sim.People.Count > 0;
+        var header = new List<string> { "Period", "City", "Buy (target)", "Sell (target)", "Output", "Use", "Capacity" };
+        if (people) header.AddRange(new[] { "People", "Unemployed", "Commute out/in" });
+        header.Add("");
+        var rows = new List<string[]> { header.ToArray() };
         foreach (var rec in sim.History.Where((r, i) => i == 0 || (i + 1) % every == 0 || i == sim.History.Count - 1))
             foreach (var c in rec.Cities)
-                rows.Add(new[]
+            {
+                var row = new List<string>
                 {
                     rec.Period.ToString(CultureInfo.InvariantCulture), names.TryGetValue(c.CityId, out var n) ? n : c.CityId,
                     $"{N(c.BuyApplied)} ({N(c.BuyTarget)})", $"{N(c.SellApplied)} ({N(c.SellTarget)})",
-                    N(c.Output), N(c.Use), N(c.Capacity), c.Frozen ? "frozen" : "",
-                });
+                    N(c.Output), N(c.Use), N(c.Capacity),
+                };
+                if (people)
+                    row.AddRange(new[]
+                    {
+                        c.Population is double pop ? pop.ToString("0", CultureInfo.InvariantCulture) : "-",
+                        c.UnemploymentRate is double u ? (u * 100).ToString("0.0", CultureInfo.InvariantCulture) + "%" : "-",
+                        $"{(c.CommutersOut ?? 0).ToString("0", CultureInfo.InvariantCulture)}/{(c.CommutersIn ?? 0).ToString("0", CultureInfo.InvariantCulture)}",
+                    });
+                row.Add(c.Frozen ? "frozen" : "");
+                rows.Add(row.ToArray());
+            }
         var widths = Enumerable.Range(0, rows[0].Length).Select(c => rows.Max(r => r[c].Length)).ToArray();
-        var numeric = new HashSet<int> { 0, 2, 3, 4, 5, 6 };
+        var numeric = new HashSet<int> { 0, 2, 3, 4, 5, 6, 7, 8, 9 };
         foreach (var r in rows)
         {
             sb.Append("  ");
