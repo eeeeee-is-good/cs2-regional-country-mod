@@ -87,6 +87,36 @@ public static class TextReport
         return sb.ToString();
     }
 
+    public static string Simulation(Simulator.RegionSimulation sim, RegionManifest manifest)
+    {
+        var names = manifest.Cities.ToDictionary(c => c.CityId, c => string.IsNullOrEmpty(c.DisplayName) ? c.CityId : c.DisplayName);
+        var sb = new StringBuilder();
+        sb.Append("Synthetic simulation: ").Append(sim.History.Count).Append(" periods. Cities react to applied prices (simulator only, not CS2).\n");
+        var every = Math.Max(1, sim.History.Count / 10);
+        var rows = new List<string[]> { new[] { "Period", "City", "Buy (target)", "Sell (target)", "Output", "Use", "Capacity", "" } };
+        foreach (var rec in sim.History.Where((r, i) => i == 0 || (i + 1) % every == 0 || i == sim.History.Count - 1))
+            foreach (var c in rec.Cities)
+                rows.Add(new[]
+                {
+                    rec.Period.ToString(CultureInfo.InvariantCulture), names.TryGetValue(c.CityId, out var n) ? n : c.CityId,
+                    $"{N(c.BuyApplied)} ({N(c.BuyTarget)})", $"{N(c.SellApplied)} ({N(c.SellTarget)})",
+                    N(c.Output), N(c.Use), N(c.Capacity), c.Frozen ? "frozen" : "",
+                });
+        var widths = Enumerable.Range(0, rows[0].Length).Select(c => rows.Max(r => r[c].Length)).ToArray();
+        var numeric = new HashSet<int> { 0, 2, 3, 4, 5, 6 };
+        foreach (var r in rows)
+        {
+            sb.Append("  ");
+            for (var c = 0; c < r.Length; c++)
+            {
+                var cell = c == r.Length - 1 ? r[c] : numeric.Contains(c) ? r[c].PadLeft(widths[c]) : r[c].PadRight(widths[c]);
+                sb.Append(cell).Append(c == r.Length - 1 ? "" : "  ");
+            }
+            sb.Append('\n');
+        }
+        return sb.ToString();
+    }
+
     public static string Signals(SignalState s, RegionManifest manifest)
     {
         var names = manifest.Cities.ToDictionary(c => c.CityId, c => string.IsNullOrEmpty(c.DisplayName) ? c.CityId : c.DisplayName);
