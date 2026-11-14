@@ -28,6 +28,7 @@ public static class Cli
           regions simulate <scenario> [options] Run a built-in region over time with synthetic cities that react to prices.
             --periods <n>                         How many periods (default 30).
             --freeze <city,city>                  Unloaded cities: they neither react nor publish.
+          regions exposure <folder>             FORECAST: what each city will meet when it returns (after advance).
           regions advance <folder> [options]    Move the region forward: applied prices step toward the targets.
             --periods <n>                         How many periods (default 1).
             --inactive <city,city>                Unloaded cities: their applied prices stay frozen.
@@ -100,6 +101,19 @@ public static class Cli
                     var periods = options.TryGetValue("periods", out var p) ? ParseInt(p, "periods", 1, 10_000) : 30;
                     sim.Run(periods);
                     stdout.Write(TextReport.Simulation(sim, region.Manifest));
+                    return Ok;
+                }
+
+                case "exposure":
+                {
+                    Require(positional, 2, "regions exposure <folder>");
+                    var store = FileRegionStore.Open(positional[1]);
+                    var signals = store.ReadSignals();
+                    if (signals == null) { stdout.Write("No periods yet. Run `regions advance` first.\n"); return Ok; }
+                    var rule = new SignalRule();
+                    if (options.TryGetValue("step", out var stepText)) rule.MaxStepFraction = ParseDouble(stepText, "step");
+                    var state = store.LoadState(ResourceTable.Load(options.GetValueOrDefault("resources")));
+                    stdout.Write(TextReport.Exposure(ExposureReport.Build(state, signals, rule), state.Manifest));
                     return Ok;
                 }
 

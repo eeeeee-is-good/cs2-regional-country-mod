@@ -156,6 +156,10 @@ public sealed class CliTests : IDisposable
         Assert.Contains("Frozen", r.Out);
         Assert.True(File.Exists(Path.Combine(dir, "signals", "state.json")));
         Assert.Contains("Region period 4.", Run("advance", dir).Out);
+        var exposure = Run("exposure", dir);
+        Assert.True(exposure.Code == Cli.Ok, exposure.Err);
+        Assert.Contains("FORECAST: what each city will meet", exposure.Out);
+        Assert.Contains("when it last published", exposure.Out);
         Assert.Equal(Cli.UsageOrInputError, Run("advance", dir, "--periods", "0").Code);
         Assert.Equal(Cli.UsageOrInputError, Run("advance", dir, "--step", "-1").Code);
     }
